@@ -1,0 +1,39 @@
+# Firebase config (kept out by project rule)
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Signing keys and service accounts (never commit)
+*.jks
+*.keystore
+key.properties
+*service-account*.json
+*-adminsdk-*.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local machine settings
+local.properties
+.idea/
+*.iml
+.vscode/
+
+# Build output and tool folders
+build/
+.dart_tool/
+.flutter-plugins*
+node_modules/
+
+# Firebase local files
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
+.firebase/
+emulator-data/
+
+# OS files
+.DS_Store
+Thumbs.db
