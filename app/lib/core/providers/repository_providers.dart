@@ -1,0 +1,39 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/fake/fake_auth_repository.dart';
+import '../../data/fake/fake_class_repository.dart';
+import '../../data/fake/fake_friend_repository.dart';
+import '../../data/fake/fake_friend_schedule_repository.dart';
+import '../../data/fake/fake_settings_repository.dart';
+import '../../data/fake/fake_shared_class_repository.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../../domain/repositories/class_repository.dart';
+import '../../domain/repositories/friend_repository.dart';
+import '../../domain/repositories/friend_schedule_repository.dart';
+import '../../domain/repositories/settings_repository.dart';
+import '../../domain/repositories/shared_class_repository.dart';
+
+// Swap these fakes for the real Firebase classes when they are ready.
+final _fakeAuth = FakeAuthRepository();
+
+final authRepositoryProvider = Provider<AuthRepository>((ref) => _fakeAuth);
+
+final settingsRepositoryProvider = Provider<SettingsRepository>(
+  (ref) => FakeSettingsRepository(_fakeAuth),
+);
+
+final classRepositoryProvider = Provider<ClassRepository>(
+  (ref) => FakeClassRepository(),
+);
+
+final friendRepositoryProvider = Provider<FriendRepository>(
+  (ref) => FakeFriendRepository(),
+);
+
+final friendScheduleRepositoryProvider = Provider<FriendScheduleRepository>(
+  (ref) => FakeFriendScheduleRepository(),
+);
+
+final sharedClassRepositoryProvider = Provider<SharedClassRepository>(
+  (ref) => FakeSharedClassRepository(),
+);
