@@ -6,6 +6,7 @@ import '../../features/auth/auth_providers.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/auth/splash_screen.dart';
 import '../widgets/placeholder_screen.dart';
+import '../widgets/app_shell.dart';
 
 /// Every screen address in the app, defined once.
 abstract final class AppRoutes {
@@ -57,26 +58,49 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SignInScreen(),
       ),
       GoRoute(
-        path: AppRoutes.timetable,
-        builder: (context, state) =>
-            const PlaceholderScreen(title: 'Timetable'),
-      ),
-      GoRoute(
         path: AppRoutes.classForm,
         builder: (context, state) => const PlaceholderScreen(title: 'Class'),
       ),
-      GoRoute(
-        path: AppRoutes.friends,
-        builder: (context, state) => const PlaceholderScreen(title: 'Friends'),
-      ),
-      GoRoute(
-        path: AppRoutes.availability,
-        builder: (context, state) =>
-            const PlaceholderScreen(title: 'Shared availability'),
-      ),
-      GoRoute(
-        path: AppRoutes.settings,
-        builder: (context, state) => const PlaceholderScreen(title: 'Settings'),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, shell) => AppShell(shell: shell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.timetable,
+                builder: (context, state) =>
+                    const PlaceholderScreen(title: 'Timetable screen'),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.availability,
+                builder: (context, state) =>
+                    const PlaceholderScreen(title: 'Free time screen'),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.friends,
+                builder: (context, state) =>
+                    const PlaceholderScreen(title: 'Friends screen'),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.settings,
+                builder: (context, state) =>
+                    const PlaceholderScreen(title: 'Me screen'),
+              ),
+            ],
+          ),
+        ],
       ),
     ],
   );
