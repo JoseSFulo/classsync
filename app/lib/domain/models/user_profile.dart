@@ -4,7 +4,7 @@ class UserProfile {
     required this.displayName,
     required this.inviteCode,
     this.photoUrl,
-    this.defaultReminderMinutes = 15,
+    this.defaultReminderMinutes = 10,
   });
 
   final String id;
