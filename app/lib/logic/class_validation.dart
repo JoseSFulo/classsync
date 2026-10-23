@@ -24,12 +24,17 @@ String? validateClass(
   }
 
   for (final other in existing) {
-    if (other.id == draft.id) continue; // editing a class never clashes with itself
+    // Editing a class must not clash with its own saved copy.
+    if (other.id == draft.id) {
+      continue;
+    }
     final sharesDay = other.days.any(draft.days.contains);
     final overlaps =
         draft.startMinute < other.endMinute &&
         other.startMinute < draft.endMinute;
-    if (sharesDay && overlaps) return 'This overlaps with ${other.name}.';
+    if (sharesDay && overlaps) {
+      return 'This overlaps with ${other.name}.';
+    }
   }
   return null;
 }

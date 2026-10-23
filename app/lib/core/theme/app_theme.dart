@@ -9,7 +9,8 @@ abstract final class AppTheme {
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(color: color),
     );
-  }  
+  }
+
   static final ThemeData light = _build(
     const ColorScheme(
       brightness: Brightness.light,
@@ -107,7 +108,7 @@ abstract final class AppTheme {
         border: _outline(colors.line),
         enabledBorder: _outline(colors.line),
         focusedBorder: _outline(scheme.primary),
-      ),      
+      ),
     );
   }
 }

@@ -22,11 +22,7 @@ ClassEntry _class({
 }
 
 String? _check(ClassEntry draft, [List<ClassEntry> existing = const []]) {
-  return validateClass(
-    draft,
-    existing: existing,
-    defaultReminderMinutes: 10,
-  );
+  return validateClass(draft, existing: existing, defaultReminderMinutes: 10);
 }
 
 void main() {

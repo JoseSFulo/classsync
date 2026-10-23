@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/auth/splash_screen.dart';
+import '../../features/timetable/class_form_screen.dart';
 import '../../features/timetable/timetable_screen.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/placeholder_screen.dart';
@@ -50,7 +51,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.classForm,
-        builder: (context, state) => const PlaceholderScreen(title: 'Class'),
+        builder: (context, state) =>
+            ClassFormScreen(classId: state.uri.queryParameters['id']),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => AppShell(shell: shell),

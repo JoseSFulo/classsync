@@ -29,7 +29,10 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   bool _showWeek = false;
 
   // The class form screen arrives on Day 3. For now it is a placeholder.
-  void _openClassForm() => context.push(AppRoutes.classForm);
+  void _addClass() => context.push(AppRoutes.classForm);
+
+  void _editClass(ClassEntry entry) =>
+      context.push(AppRoutes.editClass(entry.id));
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +43,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openClassForm,
+        onPressed: _addClass,
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         icon: const Icon(Icons.add),
@@ -108,7 +111,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                   'starts.',
             )
           else if (_showWeek)
-            WeekGrid(classes: classes, onTapClass: (_) => _openClassForm())
+            WeekGrid(classes: classes, onTapClass: _editClass)
           else ...[
             Wrap(
               spacing: AppSpacing.s,
@@ -138,7 +141,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                   child: ClassBlock(
                     entry: c,
                     defaultReminderMinutes: defaultMinutes,
-                    onTap: _openClassForm,
+                    onTap: () => _editClass(c),
                   ),
                 ),
           ],
