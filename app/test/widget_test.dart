@@ -23,7 +23,7 @@ void main() {
     await _openApp(tester);
     await _signIn(tester);
 
-    expect(find.text('Timetable screen'), findsOneWidget);
+    expect(find.text('Add class'), findsOneWidget);
   });
 
   testWidgets('the bottom bar switches between tabs', (tester) async {

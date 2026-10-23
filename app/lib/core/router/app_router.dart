@@ -5,19 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/auth/splash_screen.dart';
-import '../widgets/placeholder_screen.dart';
+import '../../features/timetable/timetable_screen.dart';
 import '../widgets/app_shell.dart';
-
-/// Every screen address in the app, defined once.
-abstract final class AppRoutes {
-  static const splash = '/splash';
-  static const signIn = '/sign-in';
-  static const timetable = '/';
-  static const classForm = '/class';
-  static const friends = '/friends';
-  static const availability = '/availability';
-  static const settings = '/settings';
-}
+import '../widgets/placeholder_screen.dart';
+import 'app_routes.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
@@ -68,8 +59,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.timetable,
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: 'Timetable screen'),
+                builder: (context, state) => const TimetableScreen(),
               ),
             ],
           ),
