@@ -1,0 +1,10 @@
+# Keeps CodeRabbit as a reviewer only. It writes summaries and comments;
+# people make the code changes.
+reviews:
+  high_level_summary: true
+  request_changes_workflow: false
+  finishing_touches:
+    autofix:
+      enabled: false
+    docstrings:
+      enabled: false
