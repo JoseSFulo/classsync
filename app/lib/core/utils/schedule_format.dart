@@ -1,6 +1,7 @@
 /// Turns minutes since midnight into H:MM, so 510 becomes 8:30.
+/// 1440 is allowed and shows as 24:00, for classes that end at midnight.
 String formatMinutes(int minutes) {
-  final safe = minutes < 0 ? 0 : (minutes > 1439 ? 1439 : minutes);
+  final safe = minutes < 0 ? 0 : (minutes > 1440 ? 1440 : minutes);
   final mins = (safe % 60).toString().padLeft(2, '0');
   return '${safe ~/ 60}:$mins';
 }

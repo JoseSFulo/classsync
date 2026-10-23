@@ -107,14 +107,9 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                   'Add your first class and I’ll remind you before it '
                   'starts.',
             )
-          else if (_showWeek) ...[
-            WeekGrid(classes: classes, onTapClass: (_) => _openClassForm()),
-            const SizedBox(height: AppSpacing.s),
-            Text(
-              '7:00 at the top, 22:00 at the bottom.',
-              style: theme.textTheme.bodySmall,
-            ),
-          ] else ...[
+          else if (_showWeek)
+            WeekGrid(classes: classes, onTapClass: (_) => _openClassForm())
+          else ...[
             Wrap(
               spacing: AppSpacing.s,
               runSpacing: AppSpacing.s,
@@ -122,6 +117,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                 for (var d = 1; d <= 7; d++)
                   PillChip(
                     label: weekdayInitial(d),
+                    semanticLabel: weekdayName(d),
                     selected: d == _day,
                     onTap: () => setState(() => _day = d),
                   ),

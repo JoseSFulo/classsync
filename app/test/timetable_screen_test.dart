@@ -43,4 +43,15 @@ void main() {
     expect(find.text('This week'), findsOneWidget);
     expect(find.text('Calculus'), findsNWidgets(3));
   });
+
+  testWidgets('weekday chips have full names for screen readers', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await _openTimetable(tester, day: 1);
+
+    expect(find.bySemanticsLabel('Tuesday'), findsOneWidget);
+
+    semantics.dispose();
+  });
 }

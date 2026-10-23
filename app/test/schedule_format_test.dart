@@ -8,9 +8,10 @@ void main() {
     expect(formatMinutes(1050), '17:30');
   });
 
-  test('formatMinutes keeps out-of-range values inside one day', () {
+  test('formatMinutes shows midnight as 24:00 and clamps beyond that', () {
+    expect(formatMinutes(1440), '24:00');
     expect(formatMinutes(-30), '0:00');
-    expect(formatMinutes(2000), '23:59');
+    expect(formatMinutes(2000), '24:00');
   });
 
   test('weekday helpers start on Monday', () {
