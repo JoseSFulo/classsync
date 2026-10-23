@@ -8,24 +8,43 @@ class FakeClassRepository implements ClassRepository {
     ClassEntry(
       id: 'class-1',
       name: 'Calculus',
-      days: [1, 3],
+      days: [1, 3, 5],
       startMinute: 480,
       endMinute: 570,
-      colorValue: 0xFF4CAF50,
+      colorValue: 0xFF2E7D6B,
       room: 'Room 204',
     ),
     ClassEntry(
       id: 'class-2',
       name: 'Programming',
       days: [2, 4],
+      startMinute: 780,
+      endMinute: 870,
+      colorValue: 0xFFB867C6,
+      room: 'Lab 5',
+    ),
+    ClassEntry(
+      id: 'class-3',
+      name: 'Physics Lab',
+      days: [3],
       startMinute: 600,
       endMinute: 720,
-      colorValue: 0xFF2196F3,
-      room: 'Lab 3',
+      colorValue: 0xFF4A7FD1,
+      room: 'Science Bldg · Lab 3',
+    ),
+    ClassEntry(
+      id: 'class-4',
+      name: 'Intro to Design',
+      days: [2, 3],
+      startMinute: 960,
+      endMinute: 1050,
+      colorValue: 0xFFE08A3C,
+      room: 'Studio B',
+      reminderMinutes: 30,
     ),
   ]);
 
-  int _nextId = 3;
+  int _nextId = 5;
 
   @override
   Stream<List<ClassEntry>> watchMyClasses() => _store.watch();
