@@ -8,6 +8,7 @@ class PillChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.semanticLabel,
     super.key,
   });
 
@@ -15,12 +16,18 @@ class PillChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// What a screen reader says when the visible label is short, like "M".
+  final String? semanticLabel;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Semantics(
       button: true,
       selected: selected,
+      label: semanticLabel ?? label,
+      onTap: onTap,
+      excludeSemantics: true,
       child: Material(
         color: selected ? scheme.primary : scheme.surface,
         shape: StadiumBorder(
