@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 
 import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
 
 class ClassSyncApp extends StatelessWidget {
   const ClassSyncApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(title: 'ClassSync', routerConfig: appRouter);
+    return MaterialApp.router(
+      title: 'ClassSync',
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
+      routerConfig: appRouter,
+    );
   }
 }
