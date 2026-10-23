@@ -14,12 +14,16 @@ import '../../domain/repositories/settings_repository.dart';
 import '../../domain/repositories/shared_class_repository.dart';
 
 // Swap these fakes for the real Firebase classes when they are ready.
-final _fakeAuth = FakeAuthRepository();
+final _fakeAuthProvider = Provider<FakeAuthRepository>(
+  (ref) => FakeAuthRepository(),
+);
 
-final authRepositoryProvider = Provider<AuthRepository>((ref) => _fakeAuth);
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => ref.watch(_fakeAuthProvider),
+);
 
 final settingsRepositoryProvider = Provider<SettingsRepository>(
-  (ref) => FakeSettingsRepository(_fakeAuth),
+  (ref) => FakeSettingsRepository(ref.watch(_fakeAuthProvider)),
 );
 
 final classRepositoryProvider = Provider<ClassRepository>(
