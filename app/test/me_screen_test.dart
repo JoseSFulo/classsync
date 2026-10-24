@@ -5,9 +5,16 @@ import 'package:classsync/features/settings/me_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:classsync/features/reminders/reminder_providers.dart';
+
+import 'support/fake_reminder_scheduler.dart';
 
 Future<ProviderContainer> _openSignedIn(WidgetTester tester) async {
-  final container = ProviderContainer();
+  final container = ProviderContainer(
+    overrides: [
+      reminderSchedulerProvider.overrideWithValue(FakeReminderScheduler()),
+    ],
+  );
   addTearDown(container.dispose);
   await container.read(authRepositoryProvider).signInWithGoogle();
 

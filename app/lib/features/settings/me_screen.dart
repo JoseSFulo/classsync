@@ -7,6 +7,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/pill_chip.dart';
 import '../../domain/failures/app_failure.dart';
 import '../auth/auth_providers.dart';
+import '../reminders/reminder_prompt.dart';
 
 class MeScreen extends ConsumerWidget {
   const MeScreen({super.key});
@@ -115,6 +116,7 @@ class MeScreen extends ConsumerWidget {
                 'delay them.',
                 style: theme.textTheme.bodySmall,
               ),
+              const ReminderAccessNotice(),
               const SizedBox(height: AppSpacing.xl),
               Text('Privacy', style: theme.textTheme.titleMedium),
               const SizedBox(height: AppSpacing.s),

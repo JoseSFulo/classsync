@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,7 @@ import '../../core/widgets/pill_chip.dart';
 import '../../domain/failures/app_failure.dart';
 import '../../domain/models/class_entry.dart';
 import '../auth/auth_providers.dart';
+import '../reminders/reminder_prompt.dart';
 import 'class_block.dart';
 import 'timetable_providers.dart';
 import 'week_grid.dart';
@@ -27,6 +29,16 @@ class TimetableScreen extends ConsumerStatefulWidget {
 class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   late int _day = widget.initialDay ?? DateTime.now().weekday;
   bool _showWeek = false;
+  @override
+  void initState() {
+    super.initState();
+    // Ask once the screen is on display, so the dialog has something behind it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(offerReminders(context, ref));
+      }
+    });
+  }
 
   // The class form screen arrives on Day 3. For now it is a placeholder.
   void _addClass() => context.push(AppRoutes.classForm);
