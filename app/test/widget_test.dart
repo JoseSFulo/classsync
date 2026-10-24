@@ -36,6 +36,6 @@ void main() {
 
     await tester.tap(find.text('Me'));
     await tester.pumpAndSettle();
-    expect(find.text('Me screen'), findsOneWidget);
+    expect(find.text('Default reminder'), findsOneWidget);
   });
 }
