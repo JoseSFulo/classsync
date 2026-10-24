@@ -4,6 +4,13 @@ import 'app_colors.dart';
 import 'app_spacing.dart';
 
 abstract final class AppTheme {
+  static OutlineInputBorder _outline(Color color) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: color),
+    );
+  }
+
   static final ThemeData light = _build(
     const ColorScheme(
       brightness: Brightness.light,
@@ -91,6 +98,17 @@ abstract final class AppTheme {
         }),
       ),
       dividerTheme: DividerThemeData(color: colors.line, space: 1),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: scheme.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.l,
+          vertical: AppSpacing.m,
+        ),
+        border: _outline(colors.line),
+        enabledBorder: _outline(colors.line),
+        focusedBorder: _outline(scheme.primary),
+      ),
     );
   }
 }
