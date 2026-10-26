@@ -9,11 +9,14 @@ class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository({
     FirebaseAuth? firebaseAuth,
     GoogleSignIn? googleSignIn,
-  })  : _auth = firebaseAuth ?? FirebaseAuth.instance,
-        _google = googleSignIn ?? GoogleSignIn.instance;
+  })  : _firebaseAuth = firebaseAuth,
+        _googleSignIn = googleSignIn;
 
-  final FirebaseAuth _auth;
-  final GoogleSignIn _google;
+  final FirebaseAuth? _firebaseAuth;
+  final GoogleSignIn? _googleSignIn;
+
+  FirebaseAuth get _auth => _firebaseAuth ?? FirebaseAuth.instance;
+  GoogleSignIn get _google => _googleSignIn ?? GoogleSignIn.instance;
 
   Future<void>? _googleInit;
   Future<void> _ensureGoogleInitialized() {
@@ -51,7 +54,6 @@ class FirebaseAuthRepository implements AuthRepository {
       rethrow;
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
-        // FIX: Throw NotSignedIn instead of UnknownFailure
         throw const NotSignedIn();
       }
       throw const UnknownFailure('Google sign-in failed. Please try again.');
@@ -62,12 +64,11 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() async {
-    // FIX: Gracefully attempt Google Sign-Out without blocking Firebase Sign-Out
     try {
       await _ensureGoogleInitialized();
       await _google.signOut();
     } catch (_) {
-      // Ignore Google cleanup errors so session teardown continues
+      // Ignore Google cleanup errors
     }
 
     try {
@@ -112,7 +113,9 @@ class FirebaseAuthRepository implements AuthRepository {
     return UserProfile(
       id: user.uid,
       displayName: user.displayName ?? 'Student',
-      inviteCode: user.uid.substring(0, 6).toUpperCase(),
+      inviteCode: user.uid.length >= 6
+          ? user.uid.substring(0, 6).toUpperCase()
+          : 'STUDENT',
     );
   }
 }
