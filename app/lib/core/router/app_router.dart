@@ -5,11 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/auth_providers.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/auth/splash_screen.dart';
-import '../../features/settings/me_screen.dart';
-import '../../features/timetable/class_form_screen.dart';
+import '../../features/availability/availability_screen.dart';
+import '../../features/friends/friends_screen.dart';
+import '../../features/settings/settings_screen.dart';
 import '../../features/timetable/timetable_screen.dart';
 import '../widgets/app_shell.dart';
-import '../widgets/placeholder_screen.dart';
 import 'app_routes.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -50,11 +50,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.signIn,
         builder: (context, state) => const SignInScreen(),
       ),
-      GoRoute(
-        path: AppRoutes.classForm,
-        builder: (context, state) =>
-            ClassFormScreen(classId: state.uri.queryParameters['id']),
-      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => AppShell(shell: shell),
         branches: [
@@ -70,8 +65,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.availability,
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: 'Free time screen'),
+                builder: (context, state) => const AvailabilityScreen(),
               ),
             ],
           ),
@@ -79,8 +73,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.friends,
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: 'Friends screen'),
+                builder: (context, state) => const FriendsScreen(),
               ),
             ],
           ),
@@ -88,7 +81,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.settings,
-                builder: (context, state) => const MeScreen(),
+                builder: (context, state) => const SettingsScreen(),
               ),
             ],
           ),
