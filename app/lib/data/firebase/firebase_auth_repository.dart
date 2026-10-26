@@ -6,17 +6,13 @@ import '../../domain/models/user_profile.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 class FirebaseAuthRepository implements AuthRepository {
-  FirebaseAuthRepository({
-    FirebaseAuth? firebaseAuth,
-    GoogleSignIn? googleSignIn,
-  })  : _firebaseAuth = firebaseAuth,
-        _googleSignIn = googleSignIn;
+  FirebaseAuthRepository({this.firebaseAuth, this.googleSignIn});
 
-  final FirebaseAuth? _firebaseAuth;
-  final GoogleSignIn? _googleSignIn;
+  final FirebaseAuth? firebaseAuth;
+  final GoogleSignIn? googleSignIn;
 
-  FirebaseAuth get _auth => _firebaseAuth ?? FirebaseAuth.instance;
-  GoogleSignIn get _google => _googleSignIn ?? GoogleSignIn.instance;
+  FirebaseAuth get _auth => firebaseAuth ?? FirebaseAuth.instance;
+  GoogleSignIn get _google => googleSignIn ?? GoogleSignIn.instance;
 
   Future<void>? _googleInit;
   Future<void> _ensureGoogleInitialized() {
@@ -26,8 +22,8 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Stream<UserProfile?> watchCurrentUser() {
     return _auth.authStateChanges().map(
-          (user) => user == null ? null : _toProfile(user),
-        );
+      (user) => user == null ? null : _toProfile(user),
+    );
   }
 
   @override
