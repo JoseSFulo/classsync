@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../core/router/app_routes.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/schedule_format.dart';
 import '../../core/widgets/empty_state.dart';
@@ -11,6 +9,7 @@ import '../../domain/failures/app_failure.dart';
 import '../../domain/models/class_entry.dart';
 import '../auth/auth_providers.dart';
 import 'class_block.dart';
+import 'class_form_sheet.dart';
 import 'timetable_providers.dart';
 import 'week_grid.dart';
 
@@ -28,8 +27,10 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   late int _day = widget.initialDay ?? DateTime.now().weekday;
   bool _showWeek = false;
 
-  // The class form screen arrives on Day 3. For now it is a placeholder.
-  void _openClassForm() => context.push(AppRoutes.classForm);
+  /// Opens the bottom sheet to add a new class (entry = null) or edit an existing one.
+  void _openClassForm([ClassEntry? entry]) {
+    ClassFormSheet.show(context, entry: entry);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +41,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openClassForm,
+        onPressed: () => _openClassForm(),
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         icon: const Icon(Icons.add),
@@ -108,7 +109,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                   'starts.',
             )
           else if (_showWeek)
-            WeekGrid(classes: classes, onTapClass: (_) => _openClassForm())
+            WeekGrid(classes: classes, onTapClass: (c) => _openClassForm(c))
           else ...[
             Wrap(
               spacing: AppSpacing.s,
@@ -138,7 +139,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                   child: ClassBlock(
                     entry: c,
                     defaultReminderMinutes: defaultMinutes,
-                    onTap: _openClassForm,
+                    onTap: () => _openClassForm(c),
                   ),
                 ),
           ],
