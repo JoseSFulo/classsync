@@ -3,10 +3,15 @@ import 'package:classsync/features/timetable/timetable_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:classsync/features/reminders/reminder_providers.dart';
+import 'support/fake_reminder_scheduler.dart';
 
 Future<void> _openTimetable(WidgetTester tester, {required int day}) async {
   await tester.pumpWidget(
     ProviderScope(
+      overrides: [
+        reminderSchedulerProvider.overrideWithValue(FakeReminderScheduler()),
+      ],
       child: MaterialApp(
         theme: AppTheme.light,
         home: TimetableScreen(initialDay: day),
