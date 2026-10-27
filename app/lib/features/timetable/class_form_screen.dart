@@ -8,6 +8,7 @@ import '../../core/providers/repository_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/schedule_format.dart';
+import '../../core/widgets/day_chips.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/pill_chip.dart';
 import '../../domain/failures/app_failure.dart';
@@ -270,21 +271,12 @@ class _ClassFormState extends ConsumerState<_ClassForm> {
                 ),
               ),
               _label('Repeats on'),
-              Wrap(
-                spacing: AppSpacing.s,
-                runSpacing: AppSpacing.s,
-                children: [
-                  for (var d = 1; d <= 7; d++)
-                    PillChip(
-                      label: weekdayInitial(d),
-                      semanticLabel: weekdayName(d),
-                      selected: _days.contains(d),
-                      onTap: () => setState(() {
-                        _error = null;
-                        _days.contains(d) ? _days.remove(d) : _days.add(d);
-                      }),
-                    ),
-                ],
+              DayChips(
+                isSelected: _days.contains,
+                onTap: (d) => setState(() {
+                  _error = null;
+                  _days.contains(d) ? _days.remove(d) : _days.add(d);
+                }),
               ),
               _label('Time'),
               Row(

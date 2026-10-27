@@ -37,13 +37,12 @@ class DefaultFirebaseOptions {
     authDomain: 'classsync-app.firebaseapp.com',
     storageBucket: 'classsync-app.appspot.com',
   );
-
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSy-placeholder',
-    appId: '1:1234567890:android:123456',
-    messagingSenderId: '1234567890',
-    projectId: 'classsync-app',
-    storageBucket: 'classsync-app.appspot.com',
+    apiKey: 'AIzaSyAvsL-KC2I6Z0axjrV90gs8Xt13khrX4j4',
+    appId: '1:214774271726:android:f4a06d8a3b4fb878d9edff',
+    messagingSenderId: '214774271726',
+    projectId: 'fir-74001',
+    storageBucket: 'fir-74001.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
