@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../domain/failures/app_failure.dart';
 import '../../domain/models/user_profile.dart';
@@ -24,9 +25,25 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Stream<UserProfile?> watchCurrentUser() {
-    return _auth.authStateChanges().map(
-      (user) => user == null ? null : _toProfile(user),
-    );
+    return _auth.authStateChanges().asyncExpand((user) {
+      if (user == null) {
+        return Stream.value(null);
+      }
+
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .map((snapshot) {
+            final savedMinutes = snapshot.data()?['defaultReminderMinutes'];
+            final defaultReminder = savedMinutes is int ? savedMinutes : 10;
+
+            return _toProfile(
+              user,
+              defaultReminderMinutes: defaultReminder,
+            );
+          });
+    });
   }
 
   @override
@@ -156,13 +173,17 @@ class FirebaseAuthRepository implements AuthRepository {
     }
   }
 
-  UserProfile _toProfile(User user) {
-    return UserProfile(
-      id: user.uid,
-      displayName: user.displayName ?? 'Student',
-      inviteCode: user.uid.length >= 6
-          ? user.uid.substring(0, 6).toUpperCase()
-          : 'STUDENT',
-    );
+    UserProfile _toProfile(
+      User user, {
+      int defaultReminderMinutes = 10,
+    }) {
+      return UserProfile(
+        id: user.uid,
+        displayName: user.displayName ?? 'Student',
+        inviteCode: user.uid.length >= 6
+            ? user.uid.substring(0, 6).toUpperCase()
+            : 'STUDENT',
+        defaultReminderMinutes: defaultReminderMinutes,
+      );
+    }
   }
-}
