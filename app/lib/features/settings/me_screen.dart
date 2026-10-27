@@ -188,7 +188,7 @@ class MeScreen extends ConsumerWidget {
                   minimumSize: const Size.fromHeight(52),
                   foregroundColor: theme.colorScheme.primary,
                   side: BorderSide(
-                    color: theme.colorScheme.primary.withOpacity(0.8),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.8),
                     width: 1.2,
                   ),
                   shape: RoundedRectangleBorder(
@@ -203,7 +203,7 @@ class MeScreen extends ConsumerWidget {
                 style: TextButton.styleFrom(
                   foregroundColor: theme.colorScheme.error,
                   backgroundColor: theme.colorScheme.errorContainer,
-                  overlayColor: theme.colorScheme.error.withOpacity(0.14),
+                  overlayColor: theme.colorScheme.error.withValues(alpha: 0.14),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppRadius.button),
