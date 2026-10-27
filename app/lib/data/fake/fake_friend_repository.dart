@@ -6,13 +6,22 @@ import '../../domain/repositories/friend_repository.dart';
 import 'fake_store.dart';
 
 class FakeFriendRepository implements FriendRepository {
+  // Sharing level is what YOU let each friend see. Maya may see class names.
   final _friends = FakeStore<List<Friend>>(const <Friend>[
-    Friend(friendId: 'friend-1', displayName: 'Alex Santos'),
+    Friend(
+      friendId: 'friend-maya',
+      displayName: 'Maya Reyes',
+      sharingLevel: SharingLevel.full,
+    ),
+    Friend(friendId: 'friend-ana', displayName: 'Ana Ramos'),
+    Friend(friendId: 'friend-ben', displayName: 'Ben Tan'),
   ]);
 
   final _requests = FakeStore<List<FriendRequest>>(const <FriendRequest>[
-    FriendRequest(id: 'req-1', fromId: 'friend-2', fromName: 'Sam Reyes'),
+    FriendRequest(id: 'req-1', fromId: 'friend-sam', fromName: 'Sam Reyes'),
   ]);
+
+  final _sentTo = <String>{};
 
   @override
   Stream<List<Friend>> watchFriends() => _friends.watch();
@@ -20,24 +29,24 @@ class FakeFriendRepository implements FriendRepository {
   @override
   Stream<List<FriendRequest>> watchIncomingRequests() => _requests.watch();
 
+  /// The only code this fake accepts is NOAH-2048.
   @override
   Future<void> sendRequestByCode(String inviteCode) async {
-    if (inviteCode != 'DEMO') throw const NotFound('No user has that code.');
-    if (_friends.value.any((f) => f.friendId == 'friend-demo')) {
-      throw const AlreadyExists('You are already friends.');
+    final code = inviteCode.toUpperCase();
+    if (code != 'NOAH-2048') {
+      throw const NotFound('No one has that code. Check it and try again.');
     }
-    _friends.value = [
-      ..._friends.value,
-      const Friend(friendId: 'friend-demo', displayName: 'Demo Friend'),
-    ];
+    if (!_sentTo.add(code)) {
+      throw const AlreadyExists('You already sent Noah a request.');
+    }
   }
 
   @override
   Future<void> acceptRequest(String requestId) async {
-    final request = _requests.value.firstWhere(
-      (r) => r.id == requestId,
-      orElse: () => throw const NotFound('Request not found.'),
-    );
+    final request = _requests.value.where((r) => r.id == requestId).firstOrNull;
+    if (request == null) {
+      throw const NotFound('Request not found.');
+    }
     _friends.value = [
       ..._friends.value,
       Friend(friendId: request.fromId, displayName: request.fromName),
