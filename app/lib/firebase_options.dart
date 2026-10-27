@@ -33,32 +33,32 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSy-placeholder',
     appId: '1:1234567890:web:123456',
     messagingSenderId: '1234567890',
-    projectId: 'classsync-app',
+    projectId: 'classsync-42ed6',
     authDomain: 'classsync-app.firebaseapp.com',
     storageBucket: 'classsync-app.appspot.com',
   );
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAvsL-KC2I6Z0axjrV90gs8Xt13khrX4j4',
-    appId: '1:214774271726:android:f4a06d8a3b4fb878d9edff',
-    messagingSenderId: '214774271726',
-    projectId: 'fir-74001',
-    storageBucket: 'fir-74001.firebasestorage.app',
+    apiKey: 'AIzaSyCAhYvkUiSrw3TYQRA4O2I0aOPcObRLBQY',
+    appId: '1:123599252272:android:566e469806c147f4ba76f5',
+    messagingSenderId: '123599252272',
+    projectId: 'classsync-42ed6',
+    storageBucket: 'classsync-42ed6.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSy-placeholder',
-    appId: '1:1234567890:ios:123456',
-    messagingSenderId: '1234567890',
-    projectId: 'classsync-app',
-    storageBucket: 'classsync-app.appspot.com',
+    apiKey: 'AIzaSyDp_zoMF2zenbtCoWXwsk40UgS2F4_Yj9Q',
+    appId: '1:123599252272:ios:e7fd0108eab805a9ba76f5',
+    messagingSenderId: '123599252272',
+    projectId: 'classsync-42ed6',
+    storageBucket: 'classsync-42ed6.firebasestorage.app',
+    iosClientId:
+        '123599252272-ktpbhniiprfelfischhalthsign97ds9.apps.googleusercontent.com',
     iosBundleId: 'com.josesfulogabomaderado.classsync',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSy-placeholder',
     appId: '1:1234567890:ios:123456',
     messagingSenderId: '1234567890',
-    projectId: 'classsync-app',
+    projectId: 'classsync-42ed6',
     storageBucket: 'classsync-app.appspot.com',
     iosBundleId: 'com.josesfulogabomaderado.classsync',
   );

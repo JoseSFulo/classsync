@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -13,9 +14,11 @@ class FirebaseAuthRepository implements AuthRepository {
   final GoogleSignIn? googleSignIn;
 
   FirebaseAuth get _auth => firebaseAuth ?? FirebaseAuth.instance;
+
   GoogleSignIn get _google => googleSignIn ?? GoogleSignIn.instance;
 
   Future<void>? _googleInit;
+
   Future<void> _ensureGoogleInitialized() {
     return _googleInit ??= _google.initialize();
   }
@@ -46,32 +49,67 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<UserProfile> signInWithGoogle() async {
     try {
+      debugPrint('[Google Sign-In] Initializing Google Sign-In...');
+
       await _ensureGoogleInitialized();
+
+      debugPrint('[Google Sign-In] Opening account selection...');
 
       final googleUser = await _google.authenticate();
 
+      debugPrint('[Google Sign-In] Account selected: ${googleUser.email}');
+
       final idToken = googleUser.authentication.idToken;
+
       if (idToken == null) {
+        debugPrint('[Google Sign-In] ERROR: ID token is null.');
+
         throw const UnknownFailure('Google did not return a sign-in token.');
       }
 
+      debugPrint(
+        '[Google Sign-In] ID token received. '
+        'Authenticating with Firebase...',
+      );
+
       final credential = GoogleAuthProvider.credential(idToken: idToken);
+
       final result = await _auth.signInWithCredential(credential);
 
       final user = result.user;
+
       if (user == null) {
+        debugPrint('[Google Sign-In] ERROR: Firebase returned no user.');
+
         throw const UnknownFailure('Sign-in failed. Please try again.');
       }
+
+      debugPrint('[Google Sign-In] SUCCESS: Firebase user authenticated.');
+
       return _toProfile(user);
     } on AppFailure {
       rethrow;
-    } on GoogleSignInException catch (e) {
+    } on GoogleSignInException catch (e, stackTrace) {
+      debugPrint('[Google Sign-In] ERROR CODE: ${e.code}');
+      debugPrint('[Google Sign-In] ERROR DETAILS: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (e.code == GoogleSignInExceptionCode.canceled) {
         throw const NotSignedIn();
       }
-      throw const UnknownFailure('Google sign-in failed. Please try again.');
-    } on FirebaseAuthException catch (e) {
+
+      rethrow;
+    } on FirebaseAuthException catch (e, stackTrace) {
+      debugPrint('[Firebase Auth] ERROR CODE: ${e.code}');
+      debugPrint('[Firebase Auth] ERROR MESSAGE: ${e.message}');
+      debugPrintStack(stackTrace: stackTrace);
+
       throw _mapFirebaseError(e);
+    } catch (e, stackTrace) {
+      debugPrint('[Google Sign-In] UNEXPECTED ERROR: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      rethrow;
     }
   }
 
@@ -80,13 +118,15 @@ class FirebaseAuthRepository implements AuthRepository {
     try {
       await _ensureGoogleInitialized();
       await _google.signOut();
-    } catch (_) {
-      // Ignore Google cleanup errors
+    } catch (e) {
+      debugPrint('[Google Sign-Out] Cleanup warning: $e');
     }
 
     try {
       await _auth.signOut();
     } on FirebaseAuthException catch (e) {
+      debugPrint('[Firebase Sign-Out] ERROR: ${e.code} - ${e.message}');
+
       throw _mapFirebaseError(e);
     }
   }
@@ -94,16 +134,24 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<void> deleteAccount() async {
     final user = _auth.currentUser;
-    if (user == null) throw const NotSignedIn();
+
+    if (user == null) {
+      throw const NotSignedIn();
+    }
+
     try {
       await user.delete();
       await signOut();
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseAuthException catch (e, stackTrace) {
+      debugPrint('[Delete Account] ERROR: ${e.code} - ${e.message}');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (e.code == 'requires-recent-login') {
         throw const UnknownFailure(
           'For security, please sign out, sign in again, then retry.',
         );
       }
+
       throw _mapFirebaseError(e);
     }
   }
@@ -112,11 +160,14 @@ class FirebaseAuthRepository implements AuthRepository {
     switch (e.code) {
       case 'network-request-failed':
         return const Offline();
+
       case 'user-disabled':
       case 'operation-not-allowed':
         return const PermissionDenied();
+
       case 'user-not-found':
         return const NotSignedIn();
+
       default:
         return UnknownFailure(e.message ?? 'Something went wrong.');
     }
