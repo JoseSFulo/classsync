@@ -13,6 +13,7 @@ import '../../features/timetable/timetable_screen.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/placeholder_screen.dart';
 import 'app_routes.dart';
+import '../../features/availability/availability_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
@@ -77,8 +78,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.availability,
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: 'Free time screen'),
+                builder: (context, state) => const AvailabilityScreen(),
               ),
             ],
           ),

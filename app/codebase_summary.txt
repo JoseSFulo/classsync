@@ -1,0 +1,5630 @@
+﻿========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\app.dart
+========================================
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
+import 'features/reminders/reminder_providers.dart';
+
+class ClassSyncApp extends ConsumerStatefulWidget {
+  const ClassSyncApp({super.key});
+
+  @override
+  ConsumerState<ClassSyncApp> createState() => _ClassSyncAppState();
+}
+
+class _ClassSyncAppState extends ConsumerState<ClassSyncApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(reminderAccessProvider);
+      ref.invalidate(reminderSyncProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.watch(reminderSyncProvider);
+    return MaterialApp.router(
+      title: 'ClassSync',
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
+      routerConfig: ref.watch(routerProvider),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\firebase_options.dart
+========================================
+import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+
+class DefaultFirebaseOptions {
+  static FirebaseOptions get currentPlatform {
+    if (kIsWeb) {
+      return web;
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return android;
+      case TargetPlatform.iOS:
+        return ios;
+      case TargetPlatform.macOS:
+        return macos;
+      case TargetPlatform.windows:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for windows.',
+        );
+      case TargetPlatform.linux:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for linux.',
+        );
+      default:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions are not supported for this platform.',
+        );
+    }
+  }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSy-placeholder',
+    appId: '1:1234567890:web:123456',
+    messagingSenderId: '1234567890',
+    projectId: 'classsync-42ed6',
+    authDomain: 'classsync-app.firebaseapp.com',
+    storageBucket: 'classsync-app.appspot.com',
+  );
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyCAhYvkUiSrw3TYQRA4O2I0aOPcObRLBQY',
+    appId: '1:123599252272:android:566e469806c147f4ba76f5',
+    messagingSenderId: '123599252272',
+    projectId: 'classsync-42ed6',
+    storageBucket: 'classsync-42ed6.firebasestorage.app',
+  );
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyDp_zoMF2zenbtCoWXwsk40UgS2F4_Yj9Q',
+    appId: '1:123599252272:ios:e7fd0108eab805a9ba76f5',
+    messagingSenderId: '123599252272',
+    projectId: 'classsync-42ed6',
+    storageBucket: 'classsync-42ed6.firebasestorage.app',
+    iosClientId:
+        '123599252272-ktpbhniiprfelfischhalthsign97ds9.apps.googleusercontent.com',
+    iosBundleId: 'com.josesfulogabomaderado.classsync',
+  );
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSy-placeholder',
+    appId: '1:1234567890:ios:123456',
+    messagingSenderId: '1234567890',
+    projectId: 'classsync-42ed6',
+    storageBucket: 'classsync-app.appspot.com',
+    iosBundleId: 'com.josesfulogabomaderado.classsync',
+  );
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\main.dart
+========================================
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'app.dart';
+import 'firebase_options.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await _startFirebase();
+  runApp(const ProviderScope(child: ClassSyncApp()));
+}
+
+/// On Android, Firebase may already be running from google-services.json.
+/// Starting it twice throws, so only start it when it isn't running yet.
+Future<void> _startFirebase() async {
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } on FirebaseException catch (error) {
+    if (error.code != 'duplicate-app') {
+      rethrow;
+    }
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\providers\repository_providers.dart
+========================================
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/fake/fake_auth_repository.dart';
+import '../../data/fake/fake_class_repository.dart';
+import '../../data/fake/fake_friend_repository.dart';
+import '../../data/fake/fake_friend_schedule_repository.dart';
+import '../../data/fake/fake_settings_repository.dart';
+import '../../data/fake/fake_shared_class_repository.dart';
+import '../../data/firebase/firebase_auth_repository.dart';
+import '../../data/firebase/firestore_class_repository.dart';
+import '../../data/firebase/firestore_friend_repository.dart';
+import '../../data/firebase/firestore_friend_schedule_repository.dart';
+import '../../data/firebase/firestore_settings_repository.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../../domain/repositories/class_repository.dart';
+import '../../domain/repositories/friend_repository.dart';
+import '../../domain/repositories/friend_schedule_repository.dart';
+import '../../domain/repositories/settings_repository.dart';
+import '../../domain/repositories/shared_class_repository.dart';
+import '../../features/auth/auth_providers.dart';
+
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  if (Firebase.apps.isEmpty) {
+    return FakeAuthRepository();
+  }
+  return FirebaseAuthRepository();
+});
+
+final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
+  if (Firebase.apps.isEmpty) {
+    final auth = ref.watch(authRepositoryProvider);
+    // Safely check the type instead of forcing a hard cast
+    return FakeSettingsRepository(
+      auth is FakeAuthRepository ? auth : FakeAuthRepository(),
+    );
+  }
+  return FirestoreSettingsRepository(
+    FirebaseFirestore.instance,
+    FirebaseAuth.instance,
+  );
+});
+
+final classRepositoryProvider = Provider<ClassRepository>((ref) {
+  if (Firebase.apps.isEmpty) {
+    return FakeClassRepository();
+  }
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) {
+    return FakeClassRepository();
+  }
+  return FirestoreClassRepository(FirebaseFirestore.instance, user.id);
+});
+
+final friendRepositoryProvider = Provider<FriendRepository>((ref) {
+  if (Firebase.apps.isEmpty) {
+    return FakeFriendRepository();
+  }
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) {
+    return FakeFriendRepository();
+  }
+  return FirestoreFriendRepository(FirebaseFirestore.instance, user.id);
+});
+
+final friendScheduleRepositoryProvider = Provider<FriendScheduleRepository>((ref) {
+  if (Firebase.apps.isEmpty) {
+    return FakeFriendScheduleRepository();
+  }
+  return FirestoreFriendScheduleRepository(FirebaseFirestore.instance);
+});
+
+final sharedClassRepositoryProvider = Provider<SharedClassRepository>(
+  (ref) => FakeSharedClassRepository(),
+);
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\router\app_router.dart
+========================================
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../features/auth/auth_providers.dart';
+import '../../features/auth/sign_in_screen.dart';
+import '../../features/auth/splash_screen.dart';
+import '../../features/friends/friends_screen.dart';
+import '../../features/friends/friend_schedule_screen.dart';
+import '../../features/settings/me_screen.dart';
+import '../../features/timetable/class_form_screen.dart';
+import '../../features/timetable/timetable_screen.dart';
+import '../widgets/app_shell.dart';
+import '../widgets/placeholder_screen.dart';
+import 'app_routes.dart';
+
+final routerProvider = Provider<GoRouter>((ref) {
+  final refresh = ValueNotifier<int>(0);
+  ref.onDispose(refresh.dispose);
+  ref.listen(authStateProvider, (_, _) => refresh.value++);
+
+  final router = GoRouter(
+    initialLocation: AppRoutes.splash,
+    refreshListenable: refresh,
+    redirect: (context, state) {
+      final auth = ref.read(authStateProvider);
+      final at = state.matchedLocation;
+
+      if (auth.isLoading) {
+        return at == AppRoutes.splash ? null : AppRoutes.splash;
+      }
+
+      final signedIn = switch (auth) {
+        AsyncData(:final value) => value != null,
+        _ => false,
+      };
+
+      if (!signedIn) {
+        return at == AppRoutes.signIn ? null : AppRoutes.signIn;
+      }
+      if (at == AppRoutes.signIn || at == AppRoutes.splash) {
+        return AppRoutes.timetable;
+      }
+      return null;
+    },
+    routes: <RouteBase>[
+      GoRoute(
+        path: AppRoutes.splash,
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.signIn,
+        builder: (context, state) => const SignInScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.classForm,
+        builder: (context, state) =>
+            ClassFormScreen(classId: state.uri.queryParameters['id']),
+      ),
+      GoRoute(
+        path: AppRoutes.friendSchedule,
+        builder: (context, state) =>
+            FriendScheduleScreen(friendId: state.pathParameters['id']!),
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, shell) => AppShell(shell: shell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.timetable,
+                builder: (context, state) => const TimetableScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.availability,
+                builder: (context, state) =>
+                    const PlaceholderScreen(title: 'Free time screen'),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.friends,
+                builder: (context, state) => const FriendsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.settings,
+                builder: (context, state) => const MeScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ],
+  );
+
+  ref.onDispose(router.dispose);
+  return router;
+});
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\router\app_routes.dart
+========================================
+/// Every screen address in the app, defined once.
+abstract final class AppRoutes {
+  static const splash = '/splash';
+  static const signIn = '/sign-in';
+  static const timetable = '/';
+  static const classForm = '/class';
+  static String editClass(String id) =>
+      '$classForm?id=${Uri.encodeQueryComponent(id)}';
+  static const friendSchedule = '/friend/:id';
+
+  static String friendScheduleFor(String id) =>
+      '/friend/${Uri.encodeComponent(id)}';
+  static const friends = '/friends';
+  static const availability = '/availability';
+  static const settings = '/settings';
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\theme\app_colors.dart
+========================================
+import 'package:flutter/material.dart';
+
+/// Colors that Material's ColorScheme has no slot for.
+@immutable
+class AppColors extends ThemeExtension<AppColors> {
+  const AppColors({
+    required this.muted,
+    required this.soft,
+    required this.line,
+    required this.accent,
+    required this.classColors,
+  });
+
+  final Color muted;
+  final Color soft;
+  final Color line;
+  final Color accent;
+
+  /// The five colors a class can be tagged with. Saved by index.
+  final List<Color> classColors;
+
+  static const light = AppColors(
+    muted: Color(0xFF667873),
+    soft: Color(0xFFE1F0EB),
+    line: Color(0xFFE0E8E5),
+    accent: Color(0xFFF0A55B),
+    classColors: [
+      Color(0xFF2E7D6B),
+      Color(0xFF4A7FD1),
+      Color(0xFFE08A3C),
+      Color(0xFFB867C6),
+      Color(0xFFD9576B),
+    ],
+  );
+
+  static const dark = AppColors(
+    muted: Color(0xFF93A59F),
+    soft: Color(0xFF20332E),
+    line: Color(0xFF2A3734),
+    accent: Color(0xFFF0A55B),
+    classColors: [
+      Color(0xFF5BBBA6),
+      Color(0xFF7FA8EA),
+      Color(0xFFEBA262),
+      Color(0xFFCF8EDB),
+      Color(0xFFEA8294),
+    ],
+  );
+
+  @override
+  AppColors copyWith({
+    Color? muted,
+    Color? soft,
+    Color? line,
+    Color? accent,
+    List<Color>? classColors,
+  }) {
+    return AppColors(
+      muted: muted ?? this.muted,
+      soft: soft ?? this.soft,
+      line: line ?? this.line,
+      accent: accent ?? this.accent,
+      classColors: classColors ?? this.classColors,
+    );
+  }
+
+  // We never animate between light and dark, so just switch at the halfway point.
+  @override
+  AppColors lerp(AppColors? other, double t) {
+    if (other == null) return this;
+    return t < 0.5 ? this : other;
+  }
+}
+
+extension AppColorsContext on BuildContext {
+  AppColors get appColors => Theme.of(this).extension<AppColors>()!;
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\theme\app_spacing.dart
+========================================
+/// Gaps and corner sizes used across the app.
+abstract final class AppSpacing {
+  static const double xs = 4;
+  static const double s = 8;
+  static const double m = 12;
+  static const double l = 16;
+  static const double xl = 24;
+  static const double xxl = 36;
+}
+
+abstract final class AppRadius {
+  static const double button = 14;
+  static const double card = 18;
+  static const double sheet = 24;
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\theme\app_theme.dart
+========================================
+import 'package:flutter/material.dart';
+
+import 'app_colors.dart';
+import 'app_spacing.dart';
+
+abstract final class AppTheme {
+  static OutlineInputBorder _outline(Color color) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: color),
+    );
+  }
+
+  static final ThemeData light = _build(
+    const ColorScheme(
+      brightness: Brightness.light,
+      primary: Color(0xFF2E7D6B),
+      onPrimary: Colors.white,
+      secondary: Color(0xFFF0A55B),
+      onSecondary: Color(0xFF2A1A05),
+      error: Color(0xFFC8473E),
+      onError: Colors.white,
+      surface: Colors.white,
+      onSurface: Color(0xFF1E2B28),
+    ),
+    AppColors.light,
+    const Color(0xFFF3F7F5),
+  );
+
+  static final ThemeData dark = _build(
+    const ColorScheme(
+      brightness: Brightness.dark,
+      primary: Color(0xFF5BBBA6),
+      onPrimary: Color(0xFF0E1513),
+      secondary: Color(0xFFF0A55B),
+      onSecondary: Color(0xFF2A1A05),
+      error: Color(0xFFF0776D),
+      onError: Color(0xFF0E1513),
+      surface: Color(0xFF1B2523),
+      onSurface: Color(0xFFE8F0ED),
+    ),
+    AppColors.dark,
+    const Color(0xFF111917),
+  );
+
+  static ThemeData _build(
+    ColorScheme scheme,
+    AppColors colors,
+    Color background,
+  ) {
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: scheme.brightness,
+      colorScheme: scheme,
+      fontFamily: 'Nunito',
+      scaffoldBackgroundColor: background,
+    );
+    final text = base.textTheme.apply(
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
+    );
+
+    return base.copyWith(
+      extensions: [colors],
+      textTheme: text.copyWith(
+        headlineMedium: text.headlineMedium!.copyWith(
+          fontSize: 26,
+          fontWeight: FontWeight.w800,
+          height: 1.15,
+        ),
+        titleMedium: text.titleMedium!.copyWith(
+          fontSize: 17,
+          fontWeight: FontWeight.w800,
+        ),
+        bodyMedium: text.bodyMedium!.copyWith(fontSize: 15),
+        bodySmall: text.bodySmall!.copyWith(fontSize: 13, color: colors.muted),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.button),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: colors.soft,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            color: selected ? scheme.primary : colors.muted,
+          );
+        }),
+      ),
+      dividerTheme: DividerThemeData(color: colors.line, space: 1),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: scheme.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.l,
+          vertical: AppSpacing.m,
+        ),
+        border: _outline(colors.line),
+        enabledBorder: _outline(colors.line),
+        focusedBorder: _outline(scheme.primary),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\utils\schedule_format.dart
+========================================
+/// Turns minutes since midnight into H:MM, so 510 becomes 8:30.
+/// 1440 is allowed and shows as 24:00, for classes that end at midnight.
+String formatMinutes(int minutes) {
+  final safe = minutes < 0 ? 0 : (minutes > 1440 ? 1440 : minutes);
+  final mins = (safe % 60).toString().padLeft(2, '0');
+  return '${safe ~/ 60}:$mins';
+}
+
+const _weekdayNames = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+/// [day] is 1 (Monday) to 7 (Sunday), the same as everywhere else in the app.
+String weekdayName(int day) => _weekdayNames[day - 1];
+
+String weekdayInitial(int day) => 'MTWTFSS'[day - 1];
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\widgets\app_shell.dart
+========================================
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+/// Frame around the four main tabs: the content plus the bottom bar.
+class AppShell extends StatelessWidget {
+  const AppShell({required this.shell, super.key});
+
+  final StatefulNavigationShell shell;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: shell,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: shell.currentIndex,
+        // Tapping the tab you are already on returns it to its first screen.
+        onDestinationSelected: (index) =>
+            shell.goBranch(index, initialLocation: index == shell.currentIndex),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.calendar_today_outlined),
+            selectedIcon: Icon(Icons.calendar_today),
+            label: 'Schedule',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.access_time),
+            selectedIcon: Icon(Icons.access_time_filled),
+            label: 'Free time',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'Friends',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Me',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\widgets\day_chips.dart
+========================================
+import 'package:flutter/material.dart';
+
+import '../theme/app_colors.dart';
+import '../utils/schedule_format.dart';
+
+/// Seven weekday chips, M to S, in one row. Each takes an equal share of
+/// the width, so they never wrap onto a second line.
+class DayChips extends StatelessWidget {
+  const DayChips({required this.isSelected, required this.onTap, super.key});
+
+  final bool Function(int day) isSelected;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var day = 1; day <= 7; day++)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: _chip(context, day),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _chip(BuildContext context, int day) {
+    final scheme = Theme.of(context).colorScheme;
+    final selected = isSelected(day);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: weekdayName(day),
+      onTap: () => onTap(day),
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? scheme.primary : scheme.surface,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: selected ? scheme.primary : context.appColors.line,
+          ),
+        ),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: () => onTap(day),
+          child: SizedBox(
+            height: 40,
+            child: Center(
+              child: Text(
+                weekdayInitial(day),
+                style: TextStyle(
+                  color: selected ? scheme.onPrimary : scheme.onSurface,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\widgets\empty_state.dart
+========================================
+import 'package:flutter/material.dart';
+
+import '../theme/app_spacing.dart';
+
+class EmptyState extends StatelessWidget {
+  const EmptyState({
+    required this.title,
+    required this.message,
+    this.emoji = 'ðŸ¦¥',
+    super.key,
+  });
+
+  final String title;
+  final String message;
+
+  /// Stand-in for the mascot until the artwork is ready.
+  final String emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 64)),
+            const SizedBox(height: AppSpacing.m),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium,
+            ),
+            const SizedBox(height: AppSpacing.s),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\widgets\initials_avatar.dart
+========================================
+import 'package:flutter/material.dart';
+
+import '../theme/app_colors.dart';
+
+/// "Maya Reyes" becomes "MR". One word gives one letter.
+String initialsOf(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((p) => p.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) {
+    return '?';
+  }
+  if (parts.length == 1) {
+    return parts.first[0].toUpperCase();
+  }
+  return (parts.first[0] + parts.last[0]).toUpperCase();
+}
+
+class InitialsAvatar extends StatelessWidget {
+  const InitialsAvatar({required this.name, this.radius = 20, super.key});
+
+  final String name;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: context.appColors.soft,
+      child: Text(
+        initialsOf(name),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w800,
+          fontSize: radius * 0.7,
+        ),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\widgets\offline_banner.dart
+========================================
+import 'package:flutter/material.dart';
+
+class OfflineBanner extends StatelessWidget {
+  const OfflineBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: Colors.orange.shade800,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: const Text(
+        "You're offline. Your schedule still works; friends' updates need internet.",
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\widgets\pill_chip.dart
+========================================
+import 'package:flutter/material.dart';
+
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+
+class PillChip extends StatelessWidget {
+  const PillChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.semanticLabel,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  /// What a screen reader says when the visible label is short, like "M".
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: semanticLabel ?? label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? scheme.primary : scheme.surface,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: selected ? scheme.primary : context.appColors.line,
+          ),
+        ),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.l,
+              vertical: AppSpacing.s,
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? scheme.onPrimary : scheme.onSurface,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\core\widgets\placeholder_screen.dart
+========================================
+import 'package:flutter/material.dart';
+
+/// Temporary stand-in shown until the real screen is built.
+class PlaceholderScreen extends StatelessWidget {
+  const PlaceholderScreen({required this.title, super.key});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(body: Center(child: Text(title)));
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\fake\fake_auth_repository.dart
+========================================
+import '../../domain/models/user_profile.dart';
+import '../../domain/repositories/auth_repository.dart';
+import 'fake_store.dart';
+
+class FakeAuthRepository implements AuthRepository {
+  /// Starts signed out. Shared with [FakeSettingsRepository].
+  final store = FakeStore<UserProfile?>(null);
+
+  @override
+  Stream<UserProfile?> watchCurrentUser() => store.watch();
+
+  @override
+  Future<UserProfile> signInWithGoogle() async {
+    const profile = UserProfile(
+      id: 'user-1',
+      displayName: 'Demo Student',
+      inviteCode: 'JC-5T92',
+    );
+    store.value = profile;
+    return profile;
+  }
+
+  @override
+  Future<void> signOut() async => store.value = null;
+
+  @override
+  Future<void> deleteAccount() async => store.value = null;
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\fake\fake_class_repository.dart
+========================================
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/class_entry.dart';
+import '../../domain/repositories/class_repository.dart';
+import 'fake_store.dart';
+
+class FakeClassRepository implements ClassRepository {
+  final _store = FakeStore<List<ClassEntry>>(const <ClassEntry>[
+    ClassEntry(
+      id: 'class-1',
+      name: 'Calculus',
+      days: [1, 3, 5],
+      startMinute: 480,
+      endMinute: 570,
+      colorValue: 0xFF2E7D6B,
+      room: 'Room 204',
+    ),
+    ClassEntry(
+      id: 'class-2',
+      name: 'Programming',
+      days: [2, 4],
+      startMinute: 780,
+      endMinute: 870,
+      colorValue: 0xFFB867C6,
+      room: 'Lab 5',
+    ),
+    ClassEntry(
+      id: 'class-3',
+      name: 'Physics Lab',
+      days: [3],
+      startMinute: 600,
+      endMinute: 720,
+      colorValue: 0xFF4A7FD1,
+      room: 'Science Bldg Â· Lab 3',
+    ),
+    ClassEntry(
+      id: 'class-4',
+      name: 'Intro to Design',
+      days: [2, 3],
+      startMinute: 960,
+      endMinute: 1050,
+      colorValue: 0xFFE08A3C,
+      room: 'Studio B',
+      reminderMinutes: 30,
+    ),
+  ]);
+
+  int _nextId = 5;
+
+  @override
+  Stream<List<ClassEntry>> watchMyClasses() => _store.watch();
+
+  @override
+  Future<ClassEntry> addClass(ClassEntry draft) async {
+    _validate(draft);
+    final saved = ClassEntry(
+      id: 'class-${_nextId++}',
+      name: draft.name,
+      days: draft.days,
+      startMinute: draft.startMinute,
+      endMinute: draft.endMinute,
+      colorValue: draft.colorValue,
+      room: draft.room,
+      reminderMinutes: draft.reminderMinutes,
+      sharedClassId: draft.sharedClassId,
+    );
+    _store.value = [..._store.value, saved];
+    return saved;
+  }
+
+  @override
+  Future<void> updateClass(ClassEntry entry) async {
+    _validate(entry);
+    _store.value = [
+      for (final c in _store.value)
+        if (c.id == entry.id) entry else c,
+    ];
+  }
+
+  @override
+  Future<void> deleteClass(String classId) async {
+    _store.value = [
+      for (final c in _store.value)
+        if (c.id != classId) c,
+    ];
+  }
+
+  void _validate(ClassEntry c) {
+    final badDay = c.days.any((d) => d < 1 || d > 7);
+    if (c.name.trim().isEmpty ||
+        c.days.isEmpty ||
+        badDay ||
+        c.startMinute < 0 ||
+        c.endMinute > 1440 ||
+        c.endMinute <= c.startMinute) {
+      throw const InvalidData('Check the name, days, and times.');
+    }
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\fake\fake_friend_repository.dart
+========================================
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/friend.dart';
+import '../../domain/models/friend_request.dart';
+import '../../domain/models/sharing_level.dart';
+import '../../domain/repositories/friend_repository.dart';
+import 'fake_store.dart';
+
+class FakeFriendRepository implements FriendRepository {
+  // Sharing level is what YOU let each friend see. Maya may see class names.
+  final _friends = FakeStore<List<Friend>>(const <Friend>[
+    Friend(
+      friendId: 'friend-maya',
+      displayName: 'Maya Reyes',
+      sharingLevel: SharingLevel.full,
+    ),
+    Friend(friendId: 'friend-ana', displayName: 'Ana Ramos'),
+    Friend(friendId: 'friend-ben', displayName: 'Ben Tan'),
+  ]);
+
+  final _requests = FakeStore<List<FriendRequest>>(const <FriendRequest>[
+    FriendRequest(id: 'req-1', fromId: 'friend-sam', fromName: 'Sam Reyes'),
+  ]);
+
+  final _sentTo = <String>{};
+
+  @override
+  Stream<List<Friend>> watchFriends() => _friends.watch();
+
+  @override
+  Stream<List<FriendRequest>> watchIncomingRequests() => _requests.watch();
+
+  /// The only code this fake accepts is NOAH-2048.
+  @override
+  Future<void> sendRequestByCode(String inviteCode) async {
+    final code = inviteCode.toUpperCase();
+    if (code != 'NOAH-2048') {
+      throw const NotFound('No one has that code. Check it and try again.');
+    }
+    if (!_sentTo.add(code)) {
+      throw const AlreadyExists('You already sent Noah a request.');
+    }
+  }
+
+  @override
+  Future<void> acceptRequest(String requestId) async {
+    final request = _requests.value.where((r) => r.id == requestId).firstOrNull;
+    if (request == null) {
+      throw const NotFound('Request not found.');
+    }
+    _friends.value = [
+      ..._friends.value,
+      Friend(friendId: request.fromId, displayName: request.fromName),
+    ];
+    await declineRequest(requestId);
+  }
+
+  @override
+  Future<void> declineRequest(String requestId) async {
+    _requests.value = [
+      for (final r in _requests.value)
+        if (r.id != requestId) r,
+    ];
+  }
+
+  @override
+  Future<void> removeFriend(String friendId) async {
+    _friends.value = [
+      for (final f in _friends.value)
+        if (f.friendId != friendId) f,
+    ];
+  }
+
+  @override
+  Future<void> setSharingLevel(String friendId, SharingLevel level) async {
+    _friends.value = [
+      for (final f in _friends.value)
+        if (f.friendId == friendId)
+          Friend(
+            friendId: f.friendId,
+            displayName: f.displayName,
+            sharingLevel: level,
+          )
+        else
+          f,
+    ];
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\fake\fake_friend_schedule_repository.dart
+========================================
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/busy_slot.dart';
+import '../../domain/models/class_entry.dart';
+import '../../domain/repositories/friend_schedule_repository.dart';
+
+class FakeFriendScheduleRepository implements FriendScheduleRepository {
+  // Only Ana shares her full timetable with you. For the others you only
+  // get busy times, like the real rules will allow.
+  static const _sharesFull = {'friend-ana'};
+
+  static const _classes = <String, List<ClassEntry>>{
+    'friend-maya': [
+      ClassEntry(
+        id: 'maya-1',
+        name: 'Biology',
+        days: [1],
+        startMinute: 480,
+        endMinute: 600,
+        colorValue: 0xFF2E7D6B,
+        room: 'Room 12',
+      ),
+      ClassEntry(
+        id: 'maya-2',
+        name: 'Chemistry',
+        days: [3],
+        startMinute: 540,
+        endMinute: 720,
+        colorValue: 0xFF4A7FD1,
+        room: 'Lab 1',
+      ),
+      ClassEntry(
+        id: 'maya-3',
+        name: 'Economics',
+        days: [3],
+        startMinute: 780,
+        endMinute: 900,
+        colorValue: 0xFFE08A3C,
+        room: 'Hall B',
+      ),
+      ClassEntry(
+        id: 'maya-4',
+        name: 'Statistics',
+        days: [4],
+        startMinute: 600,
+        endMinute: 720,
+        colorValue: 0xFFB867C6,
+        room: 'Room 8',
+      ),
+    ],
+    'friend-ana': [
+      ClassEntry(
+        id: 'ana-1',
+        name: 'Algebra',
+        days: [3],
+        startMinute: 480,
+        endMinute: 600,
+        colorValue: 0xFF2E7D6B,
+        room: 'Room 1',
+      ),
+      ClassEntry(
+        id: 'ana-2',
+        name: 'History',
+        days: [3],
+        startMinute: 720,
+        endMinute: 840,
+        colorValue: 0xFFE08A3C,
+        room: 'Room 7',
+      ),
+      ClassEntry(
+        id: 'ana-3',
+        name: 'Art',
+        days: [3],
+        startMinute: 900,
+        endMinute: 1020,
+        colorValue: 0xFFD9576B,
+        room: 'Studio 2',
+      ),
+    ],
+    'friend-ben': [
+      ClassEntry(
+        id: 'ben-1',
+        name: 'Physics',
+        days: [3],
+        startMinute: 600,
+        endMinute: 660,
+        colorValue: 0xFF4A7FD1,
+        room: 'Room 3',
+      ),
+      ClassEntry(
+        id: 'ben-2',
+        name: 'Writing',
+        days: [3],
+        startMinute: 840,
+        endMinute: 960,
+        colorValue: 0xFFB867C6,
+        room: 'Room 9',
+      ),
+    ],
+  };
+
+  @override
+  Stream<List<BusySlot>> watchBusySlots(String friendId) {
+    final classes = _classes[friendId];
+    if (classes == null) {
+      return Stream<List<BusySlot>>.error(const NotFound('Friend not found.'));
+    }
+    return Stream.value([
+      for (final c in classes)
+        for (final day in c.days)
+          BusySlot(
+            day: day,
+            startMinute: c.startMinute,
+            endMinute: c.endMinute,
+          ),
+    ]);
+  }
+
+  @override
+  Stream<List<ClassEntry>> watchFriendClasses(String friendId) {
+    final classes = _classes[friendId];
+    if (classes == null) {
+      return Stream<List<ClassEntry>>.error(
+        const NotFound('Friend not found.'),
+      );
+    }
+    if (!_sharesFull.contains(friendId)) {
+      return Stream<List<ClassEntry>>.error(const PermissionDenied());
+    }
+    return Stream.value(classes);
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\fake\fake_settings_repository.dart
+========================================
+import '../../domain/models/user_profile.dart';
+import '../../domain/repositories/settings_repository.dart';
+import 'fake_auth_repository.dart';
+
+class FakeSettingsRepository implements SettingsRepository {
+  FakeSettingsRepository(this._auth);
+
+  final FakeAuthRepository _auth;
+
+  @override
+  Future<void> setDefaultReminderMinutes(int minutes) async {
+    final current = _auth.store.value;
+    if (current == null) return;
+    _auth.store.value = UserProfile(
+      id: current.id,
+      displayName: current.displayName,
+      photoUrl: current.photoUrl,
+      inviteCode: current.inviteCode,
+      defaultReminderMinutes: minutes,
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\fake\fake_shared_class_repository.dart
+========================================
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/shared_class.dart';
+import '../../domain/repositories/shared_class_repository.dart';
+import 'fake_store.dart';
+
+class FakeSharedClassRepository implements SharedClassRepository {
+  final _store = FakeStore<List<SharedClass>>(const <SharedClass>[]);
+  int _nextId = 1;
+
+  @override
+  Stream<List<SharedClass>> watchSharedClasses() => _store.watch();
+
+  @override
+  Future<SharedClass> createSharedClass(SharedClass draft) async {
+    final id = 'shared-${_nextId++}';
+    final saved = SharedClass(
+      id: id,
+      ownerId: draft.ownerId,
+      code: 'CODE$id',
+      name: draft.name,
+      days: draft.days,
+      startMinute: draft.startMinute,
+      endMinute: draft.endMinute,
+      room: draft.room,
+    );
+    _store.value = [..._store.value, saved];
+    return saved;
+  }
+
+  @override
+  Future<SharedClass> joinByCode(String code) async {
+    if (code != 'MATH101') throw const NotFound('No class has that code.');
+    if (_store.value.any((s) => s.code == code)) {
+      throw const AlreadyExists('You already joined this class.');
+    }
+    const joined = SharedClass(
+      id: 'shared-math',
+      ownerId: 'friend-1',
+      code: 'MATH101',
+      name: 'Math 101',
+      days: [2, 4],
+      startMinute: 840,
+      endMinute: 930,
+      room: 'Room 12',
+    );
+    _store.value = [..._store.value, joined];
+    return joined;
+  }
+
+  @override
+  Future<void> updateSharedClass(SharedClass sharedClass) async {
+    _store.value = [
+      for (final s in _store.value)
+        if (s.id == sharedClass.id) sharedClass else s,
+    ];
+  }
+
+  @override
+  Future<void> leaveSharedClass(String sharedClassId) async {
+    _store.value = [
+      for (final s in _store.value)
+        if (s.id != sharedClassId) s,
+    ];
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\fake\fake_store.dart
+========================================
+import 'dart:async';
+
+/// Keeps a value in memory and tells listeners when it changes.
+class FakeStore<T> {
+  FakeStore(this._value);
+
+  T _value;
+  final _controller = StreamController<T>.broadcast();
+
+  T get value => _value;
+
+  set value(T next) {
+    _value = next;
+    _controller.add(next);
+  }
+
+  /// Emits the current value first, then every change.
+  Stream<T> watch() async* {
+    yield _value;
+    yield* _controller.stream;
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\firebase\firebase_auth_repository.dart
+========================================
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/user_profile.dart';
+import '../../domain/repositories/auth_repository.dart';
+
+class FirebaseAuthRepository implements AuthRepository {
+  FirebaseAuthRepository({this.firebaseAuth, this.googleSignIn});
+
+  final FirebaseAuth? firebaseAuth;
+  final GoogleSignIn? googleSignIn;
+
+  FirebaseAuth get _auth => firebaseAuth ?? FirebaseAuth.instance;
+
+  GoogleSignIn get _google => googleSignIn ?? GoogleSignIn.instance;
+
+  Future<void>? _googleInit;
+
+  Future<void> _ensureGoogleInitialized() {
+    return _googleInit ??= _google.initialize();
+  }
+
+  @override
+  Stream<UserProfile?> watchCurrentUser() {
+    return _auth.authStateChanges().asyncExpand((user) {
+      if (user == null) {
+        return Stream.value(null);
+      }
+
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .map((snapshot) {
+            final savedMinutes = snapshot.data()?['defaultReminderMinutes'];
+            final defaultReminder = savedMinutes is int ? savedMinutes : 10;
+
+            return _toProfile(
+              user,
+              defaultReminderMinutes: defaultReminder,
+            );
+          });
+    });
+  }
+
+  @override
+  Future<UserProfile> signInWithGoogle() async {
+    try {
+      debugPrint('[Google Sign-In] Initializing Google Sign-In...');
+
+      await _ensureGoogleInitialized();
+
+      debugPrint('[Google Sign-In] Opening account selection...');
+
+      final googleUser = await _google.authenticate();
+
+      debugPrint('[Google Sign-In] Account selected: ${googleUser.email}');
+
+      final idToken = googleUser.authentication.idToken;
+
+      if (idToken == null) {
+        debugPrint('[Google Sign-In] ERROR: ID token is null.');
+
+        throw const UnknownFailure('Google did not return a sign-in token.');
+      }
+
+      debugPrint(
+        '[Google Sign-In] ID token received. '
+        'Authenticating with Firebase...',
+      );
+
+      final credential = GoogleAuthProvider.credential(idToken: idToken);
+
+      final result = await _auth.signInWithCredential(credential);
+
+      final user = result.user;
+
+      if (user == null) {
+        debugPrint('[Google Sign-In] ERROR: Firebase returned no user.');
+
+        throw const UnknownFailure('Sign-in failed. Please try again.');
+      }
+
+      debugPrint('[Google Sign-In] SUCCESS: Firebase user authenticated.');
+
+      return _toProfile(user);
+    } on AppFailure {
+      rethrow;
+    } on GoogleSignInException catch (e, stackTrace) {
+      debugPrint('[Google Sign-In] ERROR CODE: ${e.code}');
+      debugPrint('[Google Sign-In] ERROR DETAILS: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        throw const NotSignedIn();
+      }
+
+      rethrow;
+    } on FirebaseAuthException catch (e, stackTrace) {
+      debugPrint('[Firebase Auth] ERROR CODE: ${e.code}');
+      debugPrint('[Firebase Auth] ERROR MESSAGE: ${e.message}');
+      debugPrintStack(stackTrace: stackTrace);
+
+      throw _mapFirebaseError(e);
+    } catch (e, stackTrace) {
+      debugPrint('[Google Sign-In] UNEXPECTED ERROR: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> signOut() async {
+    try {
+      await _ensureGoogleInitialized();
+      await _google.signOut();
+    } catch (e) {
+      debugPrint('[Google Sign-Out] Cleanup warning: $e');
+    }
+
+    try {
+      await _auth.signOut();
+    } on FirebaseAuthException catch (e) {
+      debugPrint('[Firebase Sign-Out] ERROR: ${e.code} - ${e.message}');
+
+      throw _mapFirebaseError(e);
+    }
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+
+    if (user == null) {
+      throw const NotSignedIn();
+    }
+
+    try {
+      await user.delete();
+      await signOut();
+    } on FirebaseAuthException catch (e, stackTrace) {
+      debugPrint('[Delete Account] ERROR: ${e.code} - ${e.message}');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (e.code == 'requires-recent-login') {
+        throw const UnknownFailure(
+          'For security, please sign out, sign in again, then retry.',
+        );
+      }
+
+      throw _mapFirebaseError(e);
+    }
+  }
+
+  AppFailure _mapFirebaseError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'network-request-failed':
+        return const Offline();
+
+      case 'user-disabled':
+      case 'operation-not-allowed':
+        return const PermissionDenied();
+
+      case 'user-not-found':
+        return const NotSignedIn();
+
+      default:
+        return UnknownFailure(e.message ?? 'Something went wrong.');
+    }
+  }
+
+    UserProfile _toProfile(
+      User user, {
+      int defaultReminderMinutes = 10,
+    }) {
+      return UserProfile(
+        id: user.uid,
+        displayName: user.displayName ?? 'Student',
+        inviteCode: user.uid.length >= 6
+            ? user.uid.substring(0, 6).toUpperCase()
+            : 'STUDENT',
+        defaultReminderMinutes: defaultReminderMinutes,
+      );
+    }
+  }
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\firebase\firestore_class_repository.dart
+========================================
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../domain/models/class_entry.dart';
+import '../../domain/repositories/class_repository.dart';
+
+/// Live implementation of [ClassRepository] backed by Firebase Firestore.
+/// Implements full CRUD (Create, Read, Update, Delete) for user schedules.
+class FirestoreClassRepository implements ClassRepository {
+  FirestoreClassRepository(this._firestore, this._userId);
+
+  final FirebaseFirestore _firestore;
+  final String _userId;
+
+  CollectionReference get _classesRef =>
+      _firestore.collection('users').doc(_userId).collection('classes');
+
+  // READ (Stream all classes live from Firestore)
+  @override
+  Stream<List<ClassEntry>> watchMyClasses() {
+    return _classesRef.snapshots().map((snap) {
+      return snap.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return ClassEntry(
+          id: doc.id,
+          name: (data['name'] as String?) ?? '',
+          days: List<int>.from((data['days'] as List?) ?? []),
+          startMinute: (data['startMinute'] as int?) ?? 0,
+          endMinute: (data['endMinute'] as int?) ?? 0,
+          colorValue: (data['colorValue'] as int?) ?? 0xFF2E7D6B,
+          room: data['room'] as String?,
+          reminderMinutes: data['reminderMinutes'] as int?,
+          sharedClassId: data['sharedClassId'] as String?,
+        );
+      }).toList();
+    });
+  }
+
+  // CREATE (Save new class entry)
+  @override
+  Future<ClassEntry> addClass(ClassEntry draft) async {
+    final docRef = _classesRef.doc();
+    final newClass = ClassEntry(
+      id: docRef.id,
+      name: draft.name,
+      days: draft.days,
+      startMinute: draft.startMinute,
+      endMinute: draft.endMinute,
+      colorValue: draft.colorValue,
+      room: draft.room,
+      reminderMinutes: draft.reminderMinutes,
+      sharedClassId: draft.sharedClassId,
+    );
+
+    await docRef.set({
+      'name': newClass.name,
+      'days': newClass.days,
+      'startMinute': newClass.startMinute,
+      'endMinute': newClass.endMinute,
+      'colorValue': newClass.colorValue,
+      'room': newClass.room,
+      'reminderMinutes': newClass.reminderMinutes,
+      'sharedClassId': newClass.sharedClassId,
+    });
+
+    return newClass;
+  }
+
+  // UPDATE (Modify existing class entry)
+  @override
+  Future<void> updateClass(ClassEntry entry) async {
+    await _classesRef.doc(entry.id).update({
+      'name': entry.name,
+      'days': entry.days,
+      'startMinute': entry.startMinute,
+      'endMinute': entry.endMinute,
+      'colorValue': entry.colorValue,
+      'room': entry.room,
+      'reminderMinutes': entry.reminderMinutes,
+    });
+  }
+
+  // DELETE (Remove class entry)
+  @override
+  Future<void> deleteClass(String classId) async {
+    await _classesRef.doc(classId).delete();
+  }
+}
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\firebase\firestore_friend_repository.dart
+========================================
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../domain/models/friend.dart';
+import '../../domain/models/friend_request.dart';
+import '../../domain/models/sharing_level.dart';
+import '../../domain/repositories/friend_repository.dart';
+
+/// Live implementation of [FriendRepository] backed by Firebase Firestore.
+class FirestoreFriendRepository implements FriendRepository {
+  FirestoreFriendRepository(this._firestore, this._userId);
+
+  final FirebaseFirestore _firestore;
+  final String _userId;
+
+  CollectionReference get _friendsRef =>
+      _firestore.collection('users').doc(_userId).collection('friends');
+
+  CollectionReference get _requestsRef =>
+      _firestore.collection('users').doc(_userId).collection('friend_requests');
+
+  @override
+  Stream<List<Friend>> watchFriends() {
+    return _friendsRef.snapshots().map((snap) {
+      return snap.docs.map<Friend>((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final levelStr = data['sharingLevel'] as String? ?? 'busyOnly';
+        return Friend(
+          friendId: doc.id,
+          displayName: (data['displayName'] as String?) ?? 'Friend',
+          sharingLevel: levelStr == 'full'
+              ? SharingLevel.full
+              : SharingLevel.busyOnly,
+        );
+      }).toList();
+    });
+  }
+
+  @override
+  Stream<List<FriendRequest>> watchIncomingRequests() {
+    return _requestsRef.snapshots().map((snap) {
+      return snap.docs.map<FriendRequest>((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return FriendRequest(
+          id: doc.id,
+          fromId: (data['fromUserId'] as String?) ?? '',
+          fromName: (data['fromName'] as String?) ?? 'Student',
+        );
+      }).toList();
+    });
+  }
+
+  @override
+  Future<void> sendRequestByCode(String code) async {
+    final query = await _firestore
+        .collection('users')
+        .where('inviteCode', isEqualTo: code)
+        .limit(1)
+        .get();
+
+    if (query.docs.isEmpty) {
+      throw Exception('Invalid invite code. No user found.');
+    }
+
+    final targetUserId = query.docs.first.id;
+
+    if (targetUserId == _userId) {
+      throw Exception('You cannot add yourself as a friend.');
+    }
+
+    final myDoc = await _firestore.collection('users').doc(_userId).get();
+    final myData = myDoc.data() ?? {};
+    final myName = (myData['displayName'] as String?) ?? 'Student';
+
+    await _firestore
+        .collection('users')
+        .doc(targetUserId)
+        .collection('friend_requests')
+        .doc(_userId)
+        .set({
+          'fromUserId': _userId,
+          'fromName': myName,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+  }
+
+  @override
+  Future<void> acceptRequest(String requestId) async {
+    final reqDoc = await _requestsRef.doc(requestId).get();
+    if (!reqDoc.exists) return;
+
+    final data = reqDoc.data() as Map<String, dynamic>;
+    final friendId = (data['fromUserId'] as String?) ?? requestId;
+    final friendName = (data['fromName'] as String?) ?? 'Friend';
+
+    final myDoc = await _firestore.collection('users').doc(_userId).get();
+    final myData = myDoc.data() ?? {};
+    final myName = (myData['displayName'] as String?) ?? 'Student';
+
+    final batch = _firestore.batch();
+
+    batch.set(_friendsRef.doc(friendId), {
+      'displayName': friendName,
+      'sharingLevel': 'busyOnly',
+    });
+
+    batch.set(
+      _firestore
+          .collection('users')
+          .doc(friendId)
+          .collection('friends')
+          .doc(_userId),
+      {'displayName': myName, 'sharingLevel': 'busyOnly'},
+    );
+
+    batch.delete(_requestsRef.doc(requestId));
+
+    await batch.commit();
+  }
+
+  @override
+  Future<void> declineRequest(String requestId) async {
+    await _requestsRef.doc(requestId).delete();
+  }
+
+  @override
+  Future<void> setSharingLevel(String friendId, SharingLevel level) async {
+    await _friendsRef.doc(friendId).update({
+      'sharingLevel': level == SharingLevel.full ? 'full' : 'busyOnly',
+    });
+  }
+
+  @override
+  Future<void> removeFriend(String friendId) async {
+    final batch = _firestore.batch();
+
+    batch.delete(_friendsRef.doc(friendId));
+
+    batch.delete(
+      _firestore
+          .collection('users')
+          .doc(friendId)
+          .collection('friends')
+          .doc(_userId),
+    );
+
+    await batch.commit();
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\firebase\firestore_friend_schedule_repository.dart
+========================================
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../domain/models/busy_slot.dart';
+import '../../domain/models/class_entry.dart';
+import '../../domain/repositories/friend_schedule_repository.dart';
+
+/// Live implementation of [FriendScheduleRepository] backed by Firebase Firestore.
+class FirestoreFriendScheduleRepository implements FriendScheduleRepository {
+  FirestoreFriendScheduleRepository(this._firestore);
+
+  final FirebaseFirestore _firestore;
+
+  @override
+  Stream<List<ClassEntry>> watchFriendClasses(String friendId) {
+    return _firestore
+        .collection('users')
+        .doc(friendId)
+        .collection('classes')
+        .snapshots()
+        .map((snap) {
+      return snap.docs.map((doc) {
+        final data = doc.data();
+        return ClassEntry(
+          id: doc.id,
+          name: (data['name'] as String?) ?? '',
+          days: List<int>.from((data['days'] as List?) ?? []),
+          startMinute: (data['startMinute'] as int?) ?? 0,
+          endMinute: (data['endMinute'] as int?) ?? 0,
+          colorValue: (data['colorValue'] as int?) ?? 0xFF2E7D6B,
+          room: data['room'] as String?,
+          reminderMinutes: data['reminderMinutes'] as int?,
+          sharedClassId: data['sharedClassId'] as String?,
+        );
+      }).toList();
+    });
+  }
+
+  @override
+  Stream<List<BusySlot>> watchBusySlots(String friendId) {
+    return watchFriendClasses(friendId).map((classes) {
+      final slots = <BusySlot>[];
+      for (final c in classes) {
+        for (final day in c.days) {
+          slots.add(
+            BusySlot(
+              day: day,
+              startMinute: c.startMinute,
+              endMinute: c.endMinute,
+            ),
+          );
+        }
+      }
+      return slots;
+    });
+  }
+}
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\data\firebase\firestore_settings_repository.dart
+========================================
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../domain/repositories/settings_repository.dart';
+
+class FirestoreSettingsRepository implements SettingsRepository {
+  FirestoreSettingsRepository(this._firestore, this._auth);
+
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+
+  @override
+  Future<void> setDefaultReminderMinutes(int minutes) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    await _firestore.collection('users').doc(uid).set({
+      'defaultReminderMinutes': minutes,
+    }, SetOptions(merge: true));
+  }
+}
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\failures\app_failure.dart
+========================================
+/// Every error the data layer may throw. Screens handle only these.
+sealed class AppFailure implements Exception {
+  const AppFailure(this.message);
+
+  final String message;
+
+  @override
+  String toString() => '$runtimeType: $message';
+}
+
+final class NotSignedIn extends AppFailure {
+  const NotSignedIn() : super('You are not signed in.');
+}
+
+final class PermissionDenied extends AppFailure {
+  const PermissionDenied() : super('You do not have permission to do this.');
+}
+
+final class NotFound extends AppFailure {
+  const NotFound(super.message);
+}
+
+final class AlreadyExists extends AppFailure {
+  const AlreadyExists(super.message);
+}
+
+final class InvalidData extends AppFailure {
+  const InvalidData(super.message);
+}
+
+final class Offline extends AppFailure {
+  const Offline() : super('No internet connection.');
+}
+
+final class UnknownFailure extends AppFailure {
+  const UnknownFailure([super.message = 'Something went wrong.']);
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\models\busy_slot.dart
+========================================
+/// A time range someone is busy. It never carries a class name or room.
+class BusySlot {
+  const BusySlot({
+    required this.day,
+    required this.startMinute,
+    required this.endMinute,
+  });
+
+  /// 1 (Monday) to 7 (Sunday).
+  final int day;
+  final int startMinute;
+  final int endMinute;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BusySlot &&
+      other.day == day &&
+      other.startMinute == startMinute &&
+      other.endMinute == endMinute;
+
+  @override
+  int get hashCode => Object.hash(day, startMinute, endMinute);
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\models\class_entry.dart
+========================================
+class ClassEntry {
+  const ClassEntry({
+    required this.id,
+    required this.name,
+    required this.days,
+    required this.startMinute,
+    required this.endMinute,
+    required this.colorValue,
+    this.room,
+    this.reminderMinutes,
+    this.sharedClassId,
+  });
+
+  final String id;
+  final String name;
+
+  /// Weekdays this class repeats on, 1 (Monday) to 7 (Sunday).
+  final List<int> days;
+
+  /// Minutes since midnight. 8:30 AM is 510.
+  final int startMinute;
+  final int endMinute;
+
+  /// Color as an ARGB integer, for example 0xFF4CAF50.
+  final int colorValue;
+
+  final String? room;
+
+  /// Overrides the default reminder. Null means use the default.
+  final int? reminderMinutes;
+
+  /// Set when this class was joined from a shared class.
+  final String? sharedClassId;
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\models\friend.dart
+========================================
+import 'sharing_level.dart';
+
+class Friend {
+  const Friend({
+    required this.friendId,
+    required this.displayName,
+    this.sharingLevel = SharingLevel.busyOnly,
+  });
+
+  final String friendId;
+  final String displayName;
+
+  /// What YOU allow this friend to see.
+  final SharingLevel sharingLevel;
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\models\friend_request.dart
+========================================
+enum FriendRequestStatus { pending, accepted, declined }
+
+class FriendRequest {
+  const FriendRequest({
+    required this.id,
+    required this.fromId,
+    required this.fromName,
+    this.status = FriendRequestStatus.pending,
+  });
+
+  final String id;
+  final String fromId;
+  final String fromName;
+  final FriendRequestStatus status;
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\models\shared_class.dart
+========================================
+class SharedClass {
+  const SharedClass({
+    required this.id,
+    required this.ownerId,
+    required this.code,
+    required this.name,
+    required this.days,
+    required this.startMinute,
+    required this.endMinute,
+    this.room,
+    this.cancelled = false,
+  });
+
+  final String id;
+  final String ownerId;
+
+  /// Short code classmates enter to join.
+  final String code;
+
+  final String name;
+  final List<int> days;
+  final int startMinute;
+  final int endMinute;
+  final String? room;
+  final bool cancelled;
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\models\sharing_level.dart
+========================================
+/// What a friend may see of your schedule.
+enum SharingLevel {
+  /// Only busy and free times. This is the default.
+  busyOnly,
+
+  /// Full class names, rooms, and times.
+  full,
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\models\user_profile.dart
+========================================
+class UserProfile {
+  const UserProfile({
+    required this.id,
+    required this.displayName,
+    required this.inviteCode,
+    this.photoUrl,
+    this.defaultReminderMinutes = 10,
+  });
+
+  final String id;
+  final String displayName;
+  final String? photoUrl;
+
+  /// Short code friends enter to send you a request.
+  final String inviteCode;
+
+  /// Minutes before class to remind, unless a class overrides it.
+  final int defaultReminderMinutes;
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\repositories\auth_repository.dart
+========================================
+import '../models/user_profile.dart';
+
+abstract interface class AuthRepository {
+  /// Emits the signed-in user's profile, or null when signed out.
+  /// Also restores the saved session when the app starts.
+  Stream<UserProfile?> watchCurrentUser();
+
+  /// Throws [NotSignedIn] if the user cancels, [Offline] without internet.
+  Future<UserProfile> signInWithGoogle();
+
+  Future<void> signOut();
+
+  /// Deletes the account and all of the user's data.
+  Future<void> deleteAccount();
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\repositories\class_repository.dart
+========================================
+import '../models/class_entry.dart';
+
+abstract interface class ClassRepository {
+  /// The signed-in user's classes. Works offline from the local copy.
+  Stream<List<ClassEntry>> watchMyClasses();
+
+  /// Pass a class with an empty id. Returns it with the real id.
+  /// Throws [InvalidData] for bad times or days.
+  Future<ClassEntry> addClass(ClassEntry draft);
+
+  Future<void> updateClass(ClassEntry entry);
+
+  Future<void> deleteClass(String classId);
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\repositories\friend_repository.dart
+========================================
+import '../models/friend.dart';
+import '../models/friend_request.dart';
+import '../models/sharing_level.dart';
+
+abstract interface class FriendRepository {
+  Stream<List<Friend>> watchFriends();
+
+  /// Requests sent to me that are still pending.
+  Stream<List<FriendRequest>> watchIncomingRequests();
+
+  /// Sends a request using the other person's invite code.
+  /// Throws [NotFound] for a wrong code, [AlreadyExists] for a duplicate
+  /// request or an existing friend.
+  Future<void> sendRequestByCode(String inviteCode);
+
+  Future<void> acceptRequest(String requestId);
+
+  Future<void> declineRequest(String requestId);
+
+  Future<void> removeFriend(String friendId);
+
+  /// Changes what this friend may see of MY schedule.
+  Future<void> setSharingLevel(String friendId, SharingLevel level);
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\repositories\friend_schedule_repository.dart
+========================================
+import '../models/busy_slot.dart';
+import '../models/class_entry.dart';
+
+abstract interface class FriendScheduleRepository {
+  /// A friend's busy times. Allowed for every accepted friend.
+  /// Throws [PermissionDenied] if you are not friends.
+  Stream<List<BusySlot>> watchBusySlots(String friendId);
+
+  /// A friend's full classes. Throws [PermissionDenied] unless the friend
+  /// set their sharing level to full for you.
+  Stream<List<ClassEntry>> watchFriendClasses(String friendId);
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\repositories\settings_repository.dart
+========================================
+abstract interface class SettingsRepository {
+  /// Changes the default reminder time. The current value is read from the
+  /// profile that [AuthRepository.watchCurrentUser] emits.
+  Future<void> setDefaultReminderMinutes(int minutes);
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\domain\repositories\shared_class_repository.dart
+========================================
+import '../models/shared_class.dart';
+
+abstract interface class SharedClassRepository {
+  /// Shared classes I created or joined. Updates live when the owner edits.
+  Stream<List<SharedClass>> watchSharedClasses();
+
+  /// Pass a class with an empty id and code. Returns it with both filled in.
+  Future<SharedClass> createSharedClass(SharedClass draft);
+
+  /// Throws [NotFound] for a wrong code, [AlreadyExists] if already joined.
+  Future<SharedClass> joinByCode(String code);
+
+  /// Owner only. Throws [PermissionDenied] for anyone else.
+  Future<void> updateSharedClass(SharedClass sharedClass);
+
+  Future<void> leaveSharedClass(String sharedClassId);
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\auth\auth_providers.dart
+========================================
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/providers/repository_providers.dart';
+import '../../domain/models/user_profile.dart';
+
+/// The signed-in user, or null when signed out.
+/// Stays in the loading state while the saved session is being checked.
+final authStateProvider = StreamProvider<UserProfile?>((ref) {
+  return ref.watch(authRepositoryProvider).watchCurrentUser();
+});
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\auth\sign_in_screen.dart
+========================================
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/providers/repository_providers.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../domain/failures/app_failure.dart';
+
+class SignInScreen extends ConsumerStatefulWidget {
+  const SignInScreen({super.key});
+
+  @override
+  ConsumerState<SignInScreen> createState() => _SignInScreenState();
+}
+
+class _SignInScreenState extends ConsumerState<SignInScreen> {
+  bool _loading = false;
+  String? _error;
+
+  Future<void> _signIn() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authRepositoryProvider).signInWithGoogle();
+      // On success the router moves us to the timetable, so nothing to do here.
+    } on AppFailure catch (failure) {
+      _showError(failure.message);
+    } catch (_) {
+      _showError('Something went wrong. Please try again.');
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _error = message;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Stand-in until the mascot artwork is ready.
+                const Text('ðŸ¦¥', style: TextStyle(fontSize: 72)),
+                const SizedBox(height: AppSpacing.l),
+                Text(
+                  'Never miss class. Find time with friends.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineMedium,
+                ),
+                const SizedBox(height: AppSpacing.m),
+                Text(
+                  'Add your classes once. Get a reminder before each one '
+                  'and see when your friends are free too.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: context.appColors.muted,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                FilledButton(
+                  onPressed: _loading ? null : _signIn,
+                  child: _loading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Continue with Google'),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: AppSpacing.m),
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.m),
+                Text(
+                  'You stay signed in on this phone. '
+                  'Friends only see busy or free by default.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\auth\splash_screen.dart
+========================================
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_spacing.dart';
+
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Stand-in until the mascot artwork is ready.
+            const Text('ðŸ¦¥', style: TextStyle(fontSize: 96)),
+            const SizedBox(height: AppSpacing.m),
+            Text('ClassSync', style: theme.textTheme.headlineMedium),
+            const SizedBox(height: AppSpacing.s),
+            Text(
+              'Syncing your scheduleâ€¦\nSlow and steady. Almost there.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\friends\friends_providers.dart
+========================================
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/providers/repository_providers.dart';
+import '../../domain/models/friend.dart';
+import '../../domain/models/friend_request.dart';
+
+final friendsProvider = StreamProvider<List<Friend>>((ref) {
+  return ref.watch(friendRepositoryProvider).watchFriends();
+});
+
+final incomingRequestsProvider = StreamProvider<List<FriendRequest>>((ref) {
+  return ref.watch(friendRepositoryProvider).watchIncomingRequests();
+});
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\friends\friends_screen.dart
+========================================
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/providers/repository_providers.dart';
+import '../../core/router/app_routes.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/initials_avatar.dart';
+import '../../core/widgets/pill_chip.dart';
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/friend.dart';
+import '../../domain/models/friend_request.dart';
+import '../../domain/models/sharing_level.dart';
+import '../auth/auth_providers.dart';
+import 'friends_providers.dart';
+
+class FriendsScreen extends ConsumerStatefulWidget {
+  const FriendsScreen({super.key});
+
+  @override
+  ConsumerState<FriendsScreen> createState() => _FriendsScreenState();
+}
+
+class _FriendsScreenState extends ConsumerState<FriendsScreen> {
+  final _code = TextEditingController();
+  final _busy = <String>{};
+  bool _sending = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  /// Runs [action]. Returns a message if it failed, or null if it worked.
+  Future<String?> _attempt(Future<void> Function() action) async {
+    try {
+      await action();
+      return null;
+    } on AppFailure catch (failure) {
+      return failure.message;
+    } catch (_) {
+      return 'Something went wrong. Please try again.';
+    }
+  }
+
+  /// Runs one action at a time per [key], then shows its result.
+  Future<void> _act(
+    String key,
+    Future<void> Function() action, {
+    String? success,
+  }) async {
+    if (_busy.contains(key)) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy.add(key));
+    final failure = await _attempt(action);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _busy.remove(key));
+    final message = failure ?? success;
+    if (message != null) {
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _copy(String code) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(ClipboardData(text: code));
+    messenger.showSnackBar(const SnackBar(content: Text('Code copied')));
+  }
+
+  Future<void> _sendRequest(String? ownCode) async {
+    final code = _code.text.trim().toUpperCase();
+    if (code.isEmpty) {
+      setState(() => _error = 'Enter your friendâ€™s code.');
+      return;
+    }
+    if (code == ownCode?.toUpperCase()) {
+      setState(() => _error = 'Thatâ€™s your own code.');
+      return;
+    }
+
+    final repo = ref.read(friendRepositoryProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    final failure = await _attempt(() => repo.sendRequestByCode(code));
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _sending = false;
+      _error = failure;
+    });
+    if (failure == null) {
+      _code.clear();
+      messenger.showSnackBar(const SnackBar(content: Text('Request sent')));
+    }
+  }
+
+  Future<void> _togglePrivacy(Friend friend) async {
+    final turningOn = friend.sharingLevel == SharingLevel.busyOnly;
+    final first = friend.displayName.split(' ').first;
+
+    if (turningOn) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Show class names to ${friend.displayName}?'),
+          content: Text(
+            '$first will see the name, room, and time of every class in '
+            'your timetable. You can turn this off any time.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Show names'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) {
+        return;
+      }
+    }
+
+    final repo = ref.read(friendRepositoryProvider);
+    await _act(
+      'privacy-${friend.friendId}',
+      () => repo.setSharingLevel(
+        friend.friendId,
+        turningOn ? SharingLevel.full : SharingLevel.busyOnly,
+      ),
+      success: turningOn
+          ? '$first can now see your class names'
+          : '$first now sees busy or free only',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ownCode = ref.watch(authStateProvider).value?.inviteCode;
+    final friends = ref.watch(friendsProvider);
+    final requests =
+        ref.watch(incomingRequestsProvider).value ?? const <FriendRequest>[];
+    final repo = ref.read(friendRepositoryProvider);
+
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Friends', style: theme.textTheme.headlineMedium),
+              const SizedBox(height: AppSpacing.l),
+              if (ownCode != null)
+                _InviteCard(code: ownCode, onCopy: () => _copy(ownCode)),
+              const SizedBox(height: AppSpacing.l),
+              Text('Add a friend', style: theme.textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.s),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _code,
+                      textCapitalization: TextCapitalization.characters,
+                      textInputAction: TextInputAction.done,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter a code',
+                      ),
+                      onChanged: (_) {
+                        if (_error != null) {
+                          setState(() => _error = null);
+                        }
+                      },
+                      onSubmitted: (_) => _sendRequest(ownCode),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(80, 52),
+                    ),
+                    onPressed: _sending ? null : () => _sendRequest(ownCode),
+                    child: _sending
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Add'),
+                  ),
+                ],
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: AppSpacing.s),
+                Text(
+                  _error!,
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+              if (requests.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xl),
+                Text('Requests', style: theme.textTheme.titleMedium),
+                const SizedBox(height: AppSpacing.s),
+                for (final request in requests)
+                  _RequestCard(
+                    request: request,
+                    busy: _busy.contains('request-${request.id}'),
+                    onAccept: () => _act(
+                      'request-${request.id}',
+                      () => repo.acceptRequest(request.id),
+                      success:
+                          'You and ${request.fromName.split(' ').first} '
+                          'are friends',
+                    ),
+                    onDecline: () => _act(
+                      'request-${request.id}',
+                      () => repo.declineRequest(request.id),
+                    ),
+                  ),
+              ],
+              const SizedBox(height: AppSpacing.xl),
+              Text('Your friends', style: theme.textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.s),
+              friends.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(AppSpacing.l),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (error, _) => EmptyState(
+                  title: 'Couldnâ€™t load your friends',
+                  message: error is AppFailure
+                      ? error.message
+                      : 'Please try again.',
+                ),
+                data: (list) => list.isEmpty
+                    ? const EmptyState(
+                        title: 'No friends yet',
+                        message:
+                            'Share your invite code, or enter a '
+                            'friendâ€™s code above.',
+                      )
+                    : Column(
+                        children: [
+                          for (final friend in list)
+                            _FriendCard(
+                              friend: friend,
+                              busy: _busy.contains(
+                                'privacy-${friend.friendId}',
+                              ),
+                              onView: () => context.push(
+                                AppRoutes.friendScheduleFor(friend.friendId),
+                              ),
+                              onTogglePrivacy: () => _togglePrivacy(friend),
+                            ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteCard extends StatelessWidget {
+  const _InviteCard({required this.code, required this.onCopy});
+
+  final String code;
+  final VoidCallback onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.l),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border.all(color: context.appColors.line),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Your invite code', style: theme.textTheme.bodySmall),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  code,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              PillChip(label: 'Copy', selected: false, onTap: onCopy),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RequestCard extends StatelessWidget {
+  const _RequestCard({
+    required this.request,
+    required this.busy,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  final FriendRequest request;
+  final bool busy;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.m),
+      padding: const EdgeInsets.all(AppSpacing.l),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border.all(color: context.appColors.line),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      child: Row(
+        children: [
+          InitialsAvatar(name: request.fromName),
+          const SizedBox(width: AppSpacing.m),
+          Expanded(
+            child: Text(request.fromName, style: theme.textTheme.titleMedium),
+          ),
+          PillChip(
+            label: 'Accept',
+            selected: true,
+            onTap: busy ? () {} : onAccept,
+          ),
+          const SizedBox(width: AppSpacing.s),
+          PillChip(
+            label: 'Decline',
+            selected: false,
+            onTap: busy ? () {} : onDecline,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendCard extends StatelessWidget {
+  const _FriendCard({
+    required this.friend,
+    required this.busy,
+    required this.onView,
+    required this.onTogglePrivacy,
+  });
+
+  final Friend friend;
+  final bool busy;
+  final VoidCallback onView;
+  final VoidCallback onTogglePrivacy;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final namesOn = friend.sharingLevel == SharingLevel.full;
+    final first = friend.displayName.split(' ').first;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.m),
+      padding: const EdgeInsets.all(AppSpacing.l),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border.all(color: context.appColors.line),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              InitialsAvatar(name: friend.displayName),
+              const SizedBox(width: AppSpacing.m),
+              Expanded(
+                child: Text(
+                  friend.displayName,
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              TextButton(onPressed: onView, child: const Text('View â€º')),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  namesOn ? 'Sees your class names' : 'Sees busy or free only',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+              PillChip(
+                label: namesOn ? 'Names on' : 'Names off',
+                semanticLabel:
+                    'Class names ${namesOn ? 'on' : 'off'} for $first',
+                selected: namesOn,
+                onTap: busy ? () {} : onTogglePrivacy,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\friends\friend_schedule_providers.dart
+========================================
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/providers/repository_providers.dart';
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/busy_slot.dart';
+import '../../domain/models/class_entry.dart';
+
+/// What you are allowed to see of a friend's timetable.
+sealed class FriendSchedule {
+  const FriendSchedule();
+}
+
+final class FullSchedule extends FriendSchedule {
+  const FullSchedule(this.classes);
+
+  final List<ClassEntry> classes;
+}
+
+final class BusySchedule extends FriendSchedule {
+  const BusySchedule(this.slots);
+
+  final List<BusySlot> slots;
+}
+
+final friendScheduleProvider = StreamProvider.family<FriendSchedule, String>((
+  ref,
+  friendId,
+) async* {
+  final repo = ref.watch(friendScheduleRepositoryProvider);
+  try {
+    await for (final classes in repo.watchFriendClasses(friendId)) {
+      yield FullSchedule(classes);
+    }
+  } on PermissionDenied {
+    // This friend shares busy times only.
+    await for (final slots in repo.watchBusySlots(friendId)) {
+      yield BusySchedule(slots);
+    }
+  }
+});
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\friends\friend_schedule_screen.dart
+========================================
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/router/app_routes.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/utils/schedule_format.dart';
+import '../../core/widgets/day_chips.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/pill_chip.dart';
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/class_entry.dart';
+import 'friend_schedule_providers.dart';
+import 'friends_providers.dart';
+
+class FriendScheduleScreen extends ConsumerStatefulWidget {
+  const FriendScheduleScreen({
+    required this.friendId,
+    this.initialDay,
+    super.key,
+  });
+
+  final String friendId;
+
+  /// 1 (Monday) to 7 (Sunday). Defaults to today.
+  final int? initialDay;
+
+  @override
+  ConsumerState<FriendScheduleScreen> createState() =>
+      _FriendScheduleScreenState();
+}
+
+class _FriendScheduleScreenState extends ConsumerState<FriendScheduleScreen> {
+  late int _day = widget.initialDay ?? DateTime.now().weekday;
+
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.friends);
+    }
+  }
+
+  String _room(ClassEntry c) {
+    final room = c.room;
+    return room == null || room.isEmpty ? 'No room' : room;
+  }
+
+  Widget _entries(FriendSchedule schedule) {
+    final cards = <Widget>[];
+    switch (schedule) {
+      case FullSchedule(:final classes):
+        final today = classes.where((c) => c.days.contains(_day)).toList()
+          ..sort((a, b) => a.startMinute.compareTo(b.startMinute));
+        for (final c in today) {
+          cards.add(
+            _EntryCard(
+              start: c.startMinute,
+              end: c.endMinute,
+              title: c.name,
+              detail: _room(c),
+              color: Color(c.colorValue),
+            ),
+          );
+        }
+      case BusySchedule(:final slots):
+        final today = slots.where((s) => s.day == _day).toList()
+          ..sort((a, b) => a.startMinute.compareTo(b.startMinute));
+        for (final s in today) {
+          cards.add(
+            _EntryCard(
+              start: s.startMinute,
+              end: s.endMinute,
+              title: 'Busy',
+              detail: 'Details are private',
+            ),
+          );
+        }
+    }
+
+    if (cards.isEmpty) {
+      return EmptyState(
+        title: 'Free all day',
+        message: 'Nothing scheduled on ${weekdayName(_day)}.',
+      );
+    }
+    return Column(children: cards);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final name =
+        ref
+            .watch(friendsProvider)
+            .value
+            ?.where((f) => f.friendId == widget.friendId)
+            .firstOrNull
+            ?.displayName ??
+        'Friend';
+    final schedule = ref.watch(friendScheduleProvider(widget.friendId));
+
+    final subtitle = switch (schedule.value) {
+      FullSchedule() => 'Shares full timetable with you.',
+      BusySchedule() => 'Shares busy and free times only.',
+      null => '',
+    };
+
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PillChip(
+                label: 'â€¹ Back',
+                semanticLabel: 'Back',
+                selected: false,
+                onTap: _back,
+              ),
+              const SizedBox(height: AppSpacing.l),
+              Text(name, style: theme.textTheme.headlineMedium),
+              const SizedBox(height: AppSpacing.xs),
+              Text(subtitle, style: theme.textTheme.bodySmall),
+              const SizedBox(height: AppSpacing.l),
+              DayChips(
+                isSelected: (d) => d == _day,
+                onTap: (d) => setState(() => _day = d),
+              ),
+              const SizedBox(height: AppSpacing.l),
+              schedule.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(AppSpacing.l),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (error, _) => EmptyState(
+                  title: 'Couldnâ€™t load this schedule',
+                  message: error is AppFailure
+                      ? error.message
+                      : 'Please try again.',
+                ),
+                data: _entries,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EntryCard extends StatelessWidget {
+  const _EntryCard({
+    required this.start,
+    required this.end,
+    required this.title,
+    required this.detail,
+    this.color,
+  });
+
+  final int start;
+  final int end;
+  final String title;
+  final String detail;
+
+  /// Null for busy blocks, which carry no class information.
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = color ?? context.appColors.muted;
+    final tint = Color.alphaBlend(
+      accent.withValues(alpha: 0.14),
+      theme.colorScheme.surface,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.m),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        child: Container(
+          color: tint,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 5, color: accent),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.m),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${formatMinutes(start)}â€“${formatMinutes(end)}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(title, style: theme.textTheme.titleMedium),
+                        Text(detail, style: theme.textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\reminders\reminder_prompt.dart
+========================================
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import 'reminder_providers.dart';
+
+/// Explains why reminders need permission, then asks for it.
+///
+/// Runs once per app session after sign-in. With [force], used by the button
+/// on the Me screen, it runs even if the explanation was already shown.
+Future<void> offerReminders(
+  BuildContext context,
+  WidgetRef ref, {
+  bool force = false,
+}) async {
+  final offer = ref.read(reminderOfferProvider);
+  if (offer.shown && !force) {
+    return;
+  }
+
+  final scheduler = ref.read(reminderSchedulerProvider);
+  if (await scheduler.isAllowed()) {
+    return;
+  }
+  if (!context.mounted) {
+    return;
+  }
+  offer.shown = true;
+
+  final agreed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Allow reminders?'),
+      content: const Text(
+        'ClassSync needs notification access to remind you before each '
+        'class. You can change this later in your phone settings.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Not now'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Allow reminders'),
+        ),
+      ],
+    ),
+  );
+  if (agreed != true || !context.mounted) {
+    return;
+  }
+
+  final granted = await scheduler.requestPermission();
+  if (!context.mounted) {
+    return;
+  }
+  ref.invalidate(reminderAccessProvider);
+
+  if (granted) {
+    // Schedule right away instead of waiting for the next change.
+    ref.invalidate(reminderSyncProvider);
+    return;
+  }
+
+  // After two refusals Android stops showing its dialog, so point to settings.
+  if (force) {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reminders are off'),
+        content: const Text(
+          'To turn them on, open your phoneâ€™s Settings, then Apps, then '
+          'ClassSync, then Notifications.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A notice on the Me screen, shown only while reminders are blocked.
+class ReminderAccessNotice extends ConsumerWidget {
+  const ReminderAccessNotice({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final allowed = ref.watch(reminderAccessProvider).value;
+    if (allowed != false) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpacing.l),
+      padding: const EdgeInsets.all(AppSpacing.l),
+      decoration: BoxDecoration(
+        color: context.appColors.soft,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Reminders are off', style: theme.textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Turn them on to get a notification before each class.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.m),
+          FilledButton(
+            onPressed: () =>
+                unawaited(offerReminders(context, ref, force: true)),
+            child: const Text('Turn on reminders'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\reminders\reminder_providers.dart
+========================================
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../logic/reminder_planner.dart';
+import '../../services/notifications/local_notification_scheduler.dart';
+import '../../services/notifications/reminder_scheduler.dart';
+import '../auth/auth_providers.dart';
+import '../timetable/timetable_providers.dart';
+
+/// Tests replace this with a fake.
+final reminderSchedulerProvider = Provider<ReminderScheduler>(
+  (ref) => LocalNotificationScheduler(),
+);
+
+/// Whether the phone currently allows notifications.
+final reminderAccessProvider = FutureProvider<bool>(
+  (ref) => ref.watch(reminderSchedulerProvider).isAllowed(),
+);
+
+/// Remembers whether the explanation was already shown in this app session.
+class ReminderOffer {
+  bool shown = false;
+}
+
+final reminderOfferProvider = Provider<ReminderOffer>((ref) => ReminderOffer());
+
+/// Keeps scheduled reminders in step with the classes, the default lead
+/// time, and who is signed in. Watched once, from the app widget.
+final reminderSyncProvider = Provider<void>((ref) {
+  final scheduler = ref.watch(reminderSchedulerProvider);
+  final auth = ref.watch(authStateProvider);
+
+  // Still checking for a saved session: leave existing reminders alone.
+  if (!auth.hasValue) {
+    return;
+  }
+
+  final profile = auth.value;
+  if (profile == null) {
+    unawaited(_apply(scheduler, const []));
+    return;
+  }
+
+  final classes = ref.watch(myClassesProvider).value;
+  if (classes == null) {
+    return;
+  }
+
+  final plan = planReminders(
+    classes: classes,
+    defaultReminderMinutes: profile.defaultReminderMinutes,
+    now: DateTime.now(),
+  );
+  unawaited(_apply(scheduler, plan));
+});
+
+Future<void> _apply(
+  ReminderScheduler scheduler,
+  List<PlannedReminder> plan,
+) async {
+  try {
+    // Nothing to show if the phone blocks notifications.
+    if (plan.isNotEmpty && !await scheduler.isAllowed()) {
+      return;
+    }
+    await scheduler.replaceAll(plan);
+  } catch (error) {
+    debugPrint('Could not update reminders: $error');
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\settings\me_screen.dart
+========================================
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/router/app_routes.dart';
+import '../../core/providers/repository_providers.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/pill_chip.dart';
+import '../../domain/failures/app_failure.dart';
+import '../auth/auth_providers.dart';
+import '../reminders/reminder_prompt.dart';
+
+class MeScreen extends ConsumerWidget {
+  const MeScreen({super.key});
+
+  static const _reminderOptions = [10, 30, 60];
+
+  String _label(int minutes) => minutes == 60 ? '1 hour' : '$minutes min';
+
+  Future<void> _setDefaultReminder(
+    BuildContext context,
+    WidgetRef ref,
+    int minutes,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(settingsRepositoryProvider)
+          .setDefaultReminderMinutes(minutes);
+    } on AppFailure catch (failure) {
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(failure.message)));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Couldnâ€™t save. Please try again.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(authRepositoryProvider).signOut();
+    } on AppFailure catch (failure) {
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(failure.message)));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Couldnâ€™t sign out. Please try again.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete your account?'),
+        content: const Text(
+          'This will permanently delete your sign-in account. '
+          'You will need to sign up again to use the app.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete account'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await ref.read(authRepositoryProvider).deleteAccount();
+
+      if (context.mounted) {
+        context.go(AppRoutes.signIn);
+      }
+    } on AppFailure catch (failure) {
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(failure.message)));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Couldnâ€™t delete the account. Please try again.'),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final profile = ref.watch(authStateProvider).value;
+    if (profile == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final name = profile.displayName.trim();
+    final initial = name.isEmpty ? '?' : name[0].toUpperCase();
+
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: context.appColors.soft,
+                    child: Text(
+                      initial,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.l),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: theme.textTheme.titleMedium),
+                        Text(
+                          'Signed in with Google',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              Text('Default reminder', style: theme.textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.s),
+              Wrap(
+                spacing: AppSpacing.s,
+                runSpacing: AppSpacing.s,
+                children: [
+                  for (final minutes in _reminderOptions)
+                    PillChip(
+                      label: _label(minutes),
+                      selected: profile.defaultReminderMinutes == minutes,
+                      onTap: () => _setDefaultReminder(context, ref, minutes),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                'Used for every new class. Reminders are notifications, so '
+                'silent mode, Do Not Disturb, or battery saver can mute or '
+                'delay them.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const ReminderAccessNotice(),
+              const SizedBox(height: AppSpacing.xl),
+              Text('Privacy', style: theme.textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                'Friends see busy or free only. Turn on class names per '
+                'friend in Friends.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              OutlinedButton(
+                onPressed: () => _signOut(context, ref),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  foregroundColor: theme.colorScheme.primary,
+                  side: BorderSide(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.8),
+                    width: 1.2,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                child: const Text('Sign out'),
+              ),
+              const SizedBox(height: AppSpacing.s),
+              TextButton(
+                onPressed: () => _deleteAccount(context, ref),
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.error,
+                  backgroundColor: theme.colorScheme.errorContainer,
+                  overlayColor: theme.colorScheme.error.withValues(alpha: 0.14),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                child: const Text('Delete account'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\timetable\class_block.dart
+========================================
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_spacing.dart';
+import '../../core/utils/schedule_format.dart';
+import '../../domain/models/class_entry.dart';
+
+class ClassBlock extends StatelessWidget {
+  const ClassBlock({
+    required this.entry,
+    required this.defaultReminderMinutes,
+    required this.onTap,
+    super.key,
+  });
+
+  final ClassEntry entry;
+  final int defaultReminderMinutes;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = Color(entry.colorValue);
+    final tint = Color.alphaBlend(
+      color.withValues(alpha: 0.14),
+      theme.colorScheme.surface,
+    );
+    final reminderAt =
+        entry.startMinute - (entry.reminderMinutes ?? defaultReminderMinutes);
+    final room = entry.room;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.button),
+      child: Material(
+        color: tint,
+        child: InkWell(
+          onTap: onTap,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 5, color: color),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.m),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${formatMinutes(entry.startMinute)}â€“'
+                          '${formatMinutes(entry.endMinute)}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(entry.name, style: theme.textTheme.titleMedium),
+                        Text(
+                          room == null || room.isEmpty ? 'No room' : room,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Reminder ${formatMinutes(reminderAt)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\timetable\class_form_screen.dart
+========================================
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/providers/repository_providers.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/utils/schedule_format.dart';
+import '../../core/widgets/day_chips.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/pill_chip.dart';
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/class_entry.dart';
+import '../../logic/class_validation.dart';
+import '../auth/auth_providers.dart';
+import 'timetable_providers.dart';
+
+/// Add a class, or edit one when [classId] is given.
+class ClassFormScreen extends ConsumerWidget {
+  const ClassFormScreen({this.classId, super.key});
+
+  final String? classId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final classes = ref.watch(myClassesProvider);
+    return classes.when(
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, _) => Scaffold(
+        appBar: AppBar(),
+        body: EmptyState(
+          title: 'Couldnâ€™t load your classes',
+          message: error is AppFailure ? error.message : 'Please try again.',
+        ),
+      ),
+      data: (list) {
+        ClassEntry? initial;
+        if (classId != null) {
+          initial = list.where((c) => c.id == classId).firstOrNull;
+          if (initial == null) {
+            return Scaffold(
+              appBar: AppBar(),
+              body: const EmptyState(
+                title: 'Class not found',
+                message: 'It may have been deleted.',
+              ),
+            );
+          }
+        }
+        return _ClassForm(initial: initial, existing: list);
+      },
+    );
+  }
+}
+
+class _ClassForm extends ConsumerStatefulWidget {
+  const _ClassForm({required this.initial, required this.existing});
+
+  final ClassEntry? initial;
+  final List<ClassEntry> existing;
+
+  @override
+  ConsumerState<_ClassForm> createState() => _ClassFormState();
+}
+
+class _ClassFormState extends ConsumerState<_ClassForm> {
+  late final TextEditingController _name;
+  late final TextEditingController _room;
+  late Set<int> _days;
+  late int _start;
+  late int _end;
+  late int _colorValue;
+  int? _reminder; // null means "use the default"
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.initial;
+    _name = TextEditingController(text: c?.name ?? '');
+    _room = TextEditingController(text: c?.room ?? '');
+    _days = c == null ? {DateTime.now().weekday} : {...c.days};
+    _start = c?.startMinute ?? 540;
+    _end = c?.endMinute ?? 600;
+    _colorValue = c?.colorValue ?? AppColors.light.classColors.first.toARGB32();
+    _reminder = c?.reminderMinutes;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _room.dispose();
+    super.dispose();
+  }
+
+  int get _defaultReminder =>
+      ref.read(authStateProvider).value?.defaultReminderMinutes ?? 10;
+
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
+  }
+
+  Future<void> _pickTime({required bool start}) async {
+    final current = start ? _start : _end;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: current ~/ 60 % 24, minute: current % 60),
+    );
+    if (picked == null || !mounted) return;
+    final minutes = picked.hour * 60 + picked.minute;
+    setState(() {
+      _error = null;
+      if (start) {
+        // Moving the start keeps the class the same length.
+        final length = max(_end - _start, 15);
+        _start = minutes;
+        _end = min(1440, minutes + length);
+      } else {
+        _end = minutes;
+      }
+    });
+  }
+
+  Future<void> _save() async {
+    final room = _room.text.trim();
+    final draft = ClassEntry(
+      id: widget.initial?.id ?? '',
+      name: _name.text.trim(),
+      days: _days.toList()..sort(),
+      startMinute: _start,
+      endMinute: _end,
+      colorValue: _colorValue,
+      room: room.isEmpty ? null : room,
+      reminderMinutes: _reminder,
+      sharedClassId: widget.initial?.sharedClassId,
+    );
+
+    final problem = validateClass(
+      draft,
+      existing: widget.existing,
+      defaultReminderMinutes: _defaultReminder,
+    );
+    if (problem != null) {
+      setState(() => _error = problem);
+      return;
+    }
+
+    final repo = ref.read(classRepositoryProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      if (widget.initial == null) {
+        await repo.addClass(draft);
+      } else {
+        await repo.updateClass(draft);
+      }
+      messenger.showSnackBar(const SnackBar(content: Text('Class saved')));
+      router.pop();
+    } on AppFailure catch (failure) {
+      _fail(failure.message);
+    } catch (_) {
+      _fail('Something went wrong. Please try again.');
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this class?'),
+        content: Text(
+          'â€œ${widget.initial!.name}â€ will be removed from your timetable.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final repo = ref.read(classRepositoryProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    setState(() => _busy = true);
+    try {
+      await repo.deleteClass(widget.initial!.id);
+      messenger.showSnackBar(const SnackBar(content: Text('Class deleted')));
+      router.pop();
+    } on AppFailure catch (failure) {
+      _fail(failure.message);
+    } catch (_) {
+      _fail('Something went wrong. Please try again.');
+    }
+  }
+
+  void _fail(String message) {
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = message;
+    });
+  }
+
+  String _minutesLabel(int minutes) =>
+      minutes == 60 ? '1 hour' : '$minutes min';
+
+  Widget _label(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.l, bottom: AppSpacing.s),
+      child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final editing = widget.initial != null;
+    final defaultMinutes =
+        ref.watch(authStateProvider).value?.defaultReminderMinutes ?? 10;
+    final lead = _reminder ?? defaultMinutes;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(editing ? 'Edit class' : 'New class'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: 'Close',
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _label('Class or event'),
+              TextField(
+                controller: _name,
+                textCapitalization: TextCapitalization.sentences,
+                maxLength: 60,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. Calculus II',
+                  counterText: '',
+                ),
+                onChanged: (_) => _clearError(),
+              ),
+              _label('Room'),
+              TextField(
+                controller: _room,
+                textCapitalization: TextCapitalization.sentences,
+                maxLength: 60,
+                decoration: const InputDecoration(
+                  hintText: 'Optional',
+                  counterText: '',
+                ),
+              ),
+              _label('Repeats on'),
+              DayChips(
+                isSelected: _days.contains,
+                onTap: (d) => setState(() {
+                  _error = null;
+                  _days.contains(d) ? _days.remove(d) : _days.add(d);
+                }),
+              ),
+              _label('Time'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _TimeButton(
+                      label: 'Starts',
+                      minutes: _start,
+                      onTap: () => _pickTime(start: true),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.m),
+                  Expanded(
+                    child: _TimeButton(
+                      label: 'Ends',
+                      minutes: _end,
+                      onTap: () => _pickTime(start: false),
+                    ),
+                  ),
+                ],
+              ),
+              _label('Color'),
+              Row(
+                children: [
+                  for (final color in AppColors.light.classColors)
+                    Padding(
+                      padding: const EdgeInsets.only(right: AppSpacing.m),
+                      child: Semantics(
+                        button: true,
+                        selected: color.toARGB32() == _colorValue,
+                        label: 'Class color',
+                        child: InkResponse(
+                          radius: 24,
+                          onTap: () =>
+                              setState(() => _colorValue = color.toARGB32()),
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                width: 3,
+                                color: color.toARGB32() == _colorValue
+                                    ? theme.colorScheme.onSurface
+                                    : Colors.transparent,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              _label('Remind me before start'),
+              Wrap(
+                spacing: AppSpacing.s,
+                runSpacing: AppSpacing.s,
+                children: [
+                  PillChip(
+                    label: 'Default (${_minutesLabel(defaultMinutes)})',
+                    selected: _reminder == null,
+                    onTap: () => setState(() {
+                      _error = null;
+                      _reminder = null;
+                    }),
+                  ),
+                  for (final option in const [10, 30, 60])
+                    if (option != defaultMinutes)
+                      PillChip(
+                        label: _minutesLabel(option),
+                        selected: _reminder == option,
+                        onTap: () => setState(() {
+                          _error = null;
+                          _reminder = option;
+                        }),
+                      ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                'Reminder at ${formatMinutes(max(0, _start - lead))}',
+                style: theme.textTheme.bodySmall,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: AppSpacing.m),
+                Text(
+                  _error!,
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.xl),
+              FilledButton(
+                onPressed: _busy ? null : _save,
+                child: _busy
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save class'),
+              ),
+              if (editing)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.s),
+                  child: TextButton(
+                    onPressed: _busy ? null : _delete,
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    child: const Text('Delete class'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeButton extends StatelessWidget {
+  const _TimeButton({
+    required this.label,
+    required this.minutes,
+    required this.onTap,
+  });
+
+  final String label;
+  final int minutes;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: InputDecorator(
+        decoration: InputDecoration(labelText: label),
+        child: Text(formatMinutes(minutes)),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\timetable\timetable_providers.dart
+========================================
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/providers/repository_providers.dart';
+import '../../domain/models/class_entry.dart';
+
+/// The signed-in user's classes. Updates by itself when they change.
+final myClassesProvider = StreamProvider<List<ClassEntry>>((ref) {
+  return ref.watch(classRepositoryProvider).watchMyClasses();
+});
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\timetable\timetable_screen.dart
+========================================
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/router/app_routes.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/utils/schedule_format.dart';
+import '../../core/widgets/day_chips.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/pill_chip.dart';
+import '../../domain/failures/app_failure.dart';
+import '../../domain/models/class_entry.dart';
+import '../auth/auth_providers.dart';
+import '../reminders/reminder_prompt.dart';
+import 'class_block.dart';
+import 'timetable_providers.dart';
+import 'week_grid.dart';
+
+class TimetableScreen extends ConsumerStatefulWidget {
+  const TimetableScreen({this.initialDay, super.key});
+
+  /// 1 (Monday) to 7 (Sunday). Defaults to today.
+  final int? initialDay;
+
+  @override
+  ConsumerState<TimetableScreen> createState() => _TimetableScreenState();
+}
+
+class _TimetableScreenState extends ConsumerState<TimetableScreen> {
+  late int _day = widget.initialDay ?? DateTime.now().weekday;
+  bool _showWeek = false;
+  @override
+  void initState() {
+    super.initState();
+    // Ask once the screen is on display, so the dialog has something behind it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(offerReminders(context, ref));
+      }
+    });
+  }
+
+  // The class form screen arrives on Day 3. For now it is a placeholder.
+  void _addClass() => context.push(AppRoutes.classForm);
+
+  void _editClass(ClassEntry entry) =>
+      context.push(AppRoutes.editClass(entry.id));
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final classes = ref.watch(myClassesProvider);
+    final defaultMinutes =
+        ref.watch(authStateProvider).value?.defaultReminderMinutes ?? 10;
+
+    return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addClass,
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        icon: const Icon(Icons.add),
+        label: const Text('Add class'),
+      ),
+      body: SafeArea(
+        child: classes.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => EmptyState(
+            title: 'Couldnâ€™t load your classes',
+            message: error is AppFailure ? error.message : 'Please try again.',
+          ),
+          data: (list) => _content(context, list, defaultMinutes),
+        ),
+      ),
+    );
+  }
+
+  Widget _content(
+    BuildContext context,
+    List<ClassEntry> classes,
+    int defaultMinutes,
+  ) {
+    final theme = Theme.of(context);
+    final today = classes.where((c) => c.days.contains(_day)).toList()
+      ..sort((a, b) => a.startMinute.compareTo(b.startMinute));
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xl,
+        AppSpacing.xl,
+        96, // keeps the last class clear of the Add class button
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _showWeek ? 'This week' : weekdayName(_day),
+                  style: theme.textTheme.headlineMedium,
+                ),
+              ),
+              PillChip(
+                label: 'Day',
+                selected: !_showWeek,
+                onTap: () => setState(() => _showWeek = false),
+              ),
+              const SizedBox(width: AppSpacing.s),
+              PillChip(
+                label: 'Week',
+                selected: _showWeek,
+                onTap: () => setState(() => _showWeek = true),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.l),
+          if (classes.isEmpty)
+            const EmptyState(
+              title: 'Nothing here yet',
+              message:
+                  'Add your first class and Iâ€™ll remind you before it '
+                  'starts.',
+            )
+          else if (_showWeek)
+            WeekGrid(classes: classes, onTapClass: _editClass)
+          else ...[
+            DayChips(
+              isSelected: (d) => d == _day,
+              onTap: (d) => setState(() => _day = d),
+            ),
+            const SizedBox(height: AppSpacing.l),
+            if (today.isEmpty)
+              EmptyState(
+                title: 'Free day',
+                message:
+                    'No classes on ${weekdayName(_day)}. '
+                    'Enjoy the slow day.',
+              )
+            else
+              for (final c in today)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                  child: ClassBlock(
+                    entry: c,
+                    defaultReminderMinutes: defaultMinutes,
+                    onTap: () => _editClass(c),
+                  ),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\features\timetable\week_grid.dart
+========================================
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/utils/schedule_format.dart';
+import '../../domain/models/class_entry.dart';
+
+class WeekGrid extends StatelessWidget {
+  const WeekGrid({required this.classes, required this.onTapClass, super.key});
+
+  final List<ClassEntry> classes;
+  final ValueChanged<ClassEntry> onTapClass;
+
+  // Minimum visible range: 7:00 to 22:00, in minutes since midnight.
+  static const _minStart = 420;
+  static const _minEnd = 1320;
+  static const _laneHeight = 380.0;
+
+  /// Earliest class start, rounded down to a whole hour.
+  int get _start {
+    final earliest = classes.fold<int>(
+      _minStart,
+      (value, c) => min(value, c.startMinute),
+    );
+    return earliest ~/ 60 * 60;
+  }
+
+  /// Latest class end, rounded up to a whole hour.
+  int get _end {
+    final latest = classes.fold<int>(
+      _minEnd,
+      (value, c) => max(value, c.endMinute),
+    );
+    return (latest + 59) ~/ 60 * 60;
+  }
+
+  double _position(int minutes) {
+    final fraction = (minutes - _start) / (_end - _start);
+    return max(0.0, min(1.0, fraction)) * _laneHeight;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var day = 1; day <= 7; day++)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Semantics(
+                        label: weekdayName(day),
+                        excludeSemantics: true,
+                        child: Text(
+                          weekdayInitial(day),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Container(
+                        height: _laneHeight,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          border: Border.all(color: context.appColors.line),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(9),
+                          child: Stack(
+                            children: [
+                              for (final c in classes.where(
+                                (c) => c.days.contains(day),
+                              ))
+                                _block(c),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.s),
+        Text(
+          '${formatMinutes(_start)} at the top, '
+          '${formatMinutes(_end)} at the bottom.',
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+
+  Widget _block(ClassEntry c) {
+    final top = _position(c.startMinute);
+    final height = max(6.0, _position(c.endMinute) - top);
+    return Positioned(
+      top: top,
+      height: height,
+      left: 2,
+      right: 2,
+      child: Material(
+        color: Color(c.colorValue),
+        borderRadius: BorderRadius.circular(6),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => onTapClass(c),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: Text(
+              c.name,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\logic\class_validation.dart
+========================================
+import '../domain/models/class_entry.dart';
+
+/// Returns a message for the first problem found, or null if the class is fine.
+///
+/// Runs before anything is saved so the user gets a clear message. The data
+/// layer has to enforce the same rules on its side.
+String? validateClass(
+  ClassEntry draft, {
+  required List<ClassEntry> existing,
+  required int defaultReminderMinutes,
+}) {
+  if (draft.name.trim().isEmpty) return 'Add a class name.';
+  if (draft.days.isEmpty) return 'Pick at least one day.';
+  if (draft.startMinute < 0 || draft.endMinute > 1440) {
+    return 'Times must be within one day.';
+  }
+  if (draft.endMinute <= draft.startMinute) {
+    return 'End time must be after the start time.';
+  }
+
+  final lead = draft.reminderMinutes ?? defaultReminderMinutes;
+  if (draft.startMinute - lead < 0) {
+    return 'That reminder falls before midnight. Choose a shorter one.';
+  }
+
+  for (final other in existing) {
+    // Editing a class must not clash with its own saved copy.
+    if (other.id == draft.id) {
+      continue;
+    }
+    final sharesDay = other.days.any(draft.days.contains);
+    final overlaps =
+        draft.startMinute < other.endMinute &&
+        other.startMinute < draft.endMinute;
+    if (sharesDay && overlaps) {
+      return 'This overlaps with ${other.name}.';
+    }
+  }
+  return null;
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\logic\reminder_planner.dart
+========================================
+import '../core/utils/schedule_format.dart';
+import '../domain/models/class_entry.dart';
+
+/// How many days ahead reminders are scheduled. The app refreshes the window
+/// every time it opens and whenever classes change.
+const reminderWindowDays = 7;
+
+/// iOS keeps at most 64 pending notifications, so we stay below that.
+const maxScheduledReminders = 60;
+
+class PlannedReminder {
+  const PlannedReminder({
+    required this.id,
+    required this.at,
+    required this.title,
+    required this.body,
+  });
+
+  /// 0, 1, 2... in time order. Safe to reuse because every refresh cancels
+  /// all pending reminders before scheduling the new set.
+  final int id;
+
+  /// Local time the reminder should appear.
+  final DateTime at;
+  final String title;
+  final String body;
+}
+
+/// Works out which reminders should be scheduled from [now] onwards.
+List<PlannedReminder> planReminders({
+  required List<ClassEntry> classes,
+  required int defaultReminderMinutes,
+  required DateTime now,
+  int days = reminderWindowDays,
+  int maxCount = maxScheduledReminders,
+}) {
+  final found = <({DateTime at, ClassEntry entry})>[];
+
+  for (var offset = 0; offset < days; offset++) {
+    // DateTime rolls over month ends by itself, so day + offset is safe.
+    final day = DateTime(now.year, now.month, now.day + offset);
+    for (final entry in classes) {
+      if (!entry.days.contains(day.weekday)) {
+        continue;
+      }
+      final lead = entry.reminderMinutes ?? defaultReminderMinutes;
+      final at = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        0,
+        entry.startMinute - lead,
+      );
+      if (at.isAfter(now)) {
+        found.add((at: at, entry: entry));
+      }
+    }
+  }
+
+  found.sort((a, b) => a.at.compareTo(b.at));
+  final chosen = found.take(maxCount).toList();
+
+  return [
+    for (var i = 0; i < chosen.length; i++)
+      PlannedReminder(
+        id: i,
+        at: chosen[i].at,
+        title: chosen[i].entry.name,
+        body: _body(chosen[i].entry),
+      ),
+  ];
+}
+
+String _body(ClassEntry entry) {
+  final room = entry.room;
+  final start = 'Starts at ${formatMinutes(entry.startMinute)}';
+  return room == null || room.isEmpty ? start : '$start Â· $room';
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\services\notifications\local_notification_scheduler.dart
+========================================
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+
+import '../../logic/reminder_planner.dart';
+import 'reminder_scheduler.dart';
+
+class LocalNotificationScheduler implements ReminderScheduler {
+  LocalNotificationScheduler([FlutterLocalNotificationsPlugin? plugin])
+    : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+
+  final FlutterLocalNotificationsPlugin _plugin;
+
+  // Runs the plugin setup once, on first use.
+  late final Future<void> _ready = _initialize();
+
+  // Updates run one at a time, in the order they were requested.
+  Future<void> _lastUpdate = Future<void>.value();
+
+  static const _details = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'class_reminders',
+      'Class reminders',
+      channelDescription: 'Reminders before your classes start',
+      importance: Importance.high,
+      priority: Priority.high,
+    ),
+  );
+
+  AndroidFlutterLocalNotificationsPlugin? get _android => _plugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
+
+  Future<void> _initialize() async {
+    await _plugin.initialize(
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Future<bool> isAllowed() async {
+    await _ready;
+    final android = _android;
+    // iOS permission handling is added with the iOS compile check.
+    if (android == null) {
+      return true;
+    }
+    return await android.areNotificationsEnabled() ?? false;
+  }
+
+  @override
+  Future<bool> requestPermission() async {
+    await _ready;
+    final android = _android;
+    if (android == null) {
+      return true;
+    }
+    return await android.requestNotificationsPermission() ?? false;
+  }
+
+  @override
+  Future<void> replaceAll(List<PlannedReminder> reminders) {
+    final run = _lastUpdate.then(
+      (_) => _replace(reminders),
+      onError: (_) => _replace(reminders),
+    );
+    _lastUpdate = run;
+    return run;
+  }
+
+  Future<void> _replace(List<PlannedReminder> reminders) async {
+    await _ready;
+    await _plugin.cancelAllPendingNotifications();
+    if (reminders.isEmpty) {
+      return;
+    }
+
+    // Exact times when Android allows it, otherwise close to the time.
+    final exact = await _android?.canScheduleExactNotifications() ?? true;
+    final mode = exact
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
+
+    for (final reminder in reminders) {
+      try {
+        await _plugin.zonedSchedule(
+          id: reminder.id,
+          title: reminder.title,
+          body: reminder.body,
+          // An exact moment in time, so the phone's time zone doesn't matter.
+          scheduledDate: tz.TZDateTime.from(reminder.at.toUtc(), tz.UTC),
+          notificationDetails: _details,
+          androidScheduleMode: mode,
+        );
+      } on ArgumentError {
+        // The time passed while we were scheduling. Skip it.
+      }
+    }
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\lib\services\notifications\reminder_scheduler.dart
+========================================
+import '../../logic/reminder_planner.dart';
+
+/// What the app needs from the phone's notification system.
+/// Screens and providers use this, never the plugin directly.
+abstract interface class ReminderScheduler {
+  /// True if the phone currently allows notifications from this app.
+  Future<bool> isAllowed();
+
+  /// Shows the system permission dialog. Returns whether it was granted.
+  Future<bool> requestPermission();
+
+  /// Cancels every pending reminder, then schedules [reminders].
+  Future<void> replaceAll(List<PlannedReminder> reminders);
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\class_form_screen_test.dart
+========================================
+import 'package:classsync/core/theme/app_theme.dart';
+import 'package:classsync/features/timetable/class_form_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+Future<void> _open(WidgetTester tester, {String? classId}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: ClassFormScreen(classId: classId),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('a new class cannot be saved without a name', (tester) async {
+    await _open(tester);
+
+    expect(find.text('New class'), findsOneWidget);
+    await tester.ensureVisible(find.text('Save class'));
+    await tester.tap(find.text('Save class'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add a class name.'), findsOneWidget);
+  });
+
+  testWidgets('editing shows the saved class and a delete button', (
+    tester,
+  ) async {
+    await _open(tester, classId: 'class-1');
+
+    expect(find.text('Edit class'), findsOneWidget);
+    expect(find.text('Calculus'), findsOneWidget);
+    expect(find.text('Delete class'), findsOneWidget);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\class_validation_test.dart
+========================================
+import 'package:classsync/domain/models/class_entry.dart';
+import 'package:classsync/logic/class_validation.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+ClassEntry _class({
+  String id = 'new',
+  String name = 'Chemistry',
+  List<int> days = const [1],
+  int start = 540,
+  int end = 600,
+  int? reminder,
+}) {
+  return ClassEntry(
+    id: id,
+    name: name,
+    days: days,
+    startMinute: start,
+    endMinute: end,
+    colorValue: 0xFF2E7D6B,
+    reminderMinutes: reminder,
+  );
+}
+
+String? _check(ClassEntry draft, [List<ClassEntry> existing = const []]) {
+  return validateClass(draft, existing: existing, defaultReminderMinutes: 10);
+}
+
+void main() {
+  test('a normal class is valid', () {
+    expect(_check(_class()), isNull);
+  });
+
+  test('rejects an empty name', () {
+    expect(_check(_class(name: '   ')), 'Add a class name.');
+  });
+
+  test('rejects a class with no days', () {
+    expect(_check(_class(days: [])), 'Pick at least one day.');
+  });
+
+  test('rejects an end time that is not after the start time', () {
+    expect(_check(_class(start: 600, end: 540)), isNotNull);
+    expect(_check(_class(start: 600, end: 600)), isNotNull);
+  });
+
+  test('allows a class that ends at midnight', () {
+    expect(_check(_class(start: 1380, end: 1440)), isNull);
+  });
+
+  test('rejects a reminder that falls before midnight', () {
+    expect(_check(_class(start: 5, end: 60)), isNotNull);
+    expect(_check(_class(start: 40, end: 90, reminder: 60)), isNotNull);
+  });
+
+  test('rejects an overlap on a shared day', () {
+    final other = _class(id: 'a', name: 'Physics', start: 570, end: 660);
+    expect(_check(_class(), [other]), 'This overlaps with Physics.');
+  });
+
+  test('allows back-to-back classes', () {
+    final other = _class(id: 'a', start: 480, end: 540);
+    expect(_check(_class(start: 540, end: 600), [other]), isNull);
+  });
+
+  test('allows the same time on a different day', () {
+    final other = _class(id: 'a', days: [2]);
+    expect(_check(_class(days: [1]), [other]), isNull);
+  });
+
+  test('editing a class does not clash with itself', () {
+    final saved = _class(id: 'a');
+    expect(_check(_class(id: 'a'), [saved]), isNull);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\fake_class_repository_test.dart
+========================================
+import 'package:classsync/data/fake/fake_class_repository.dart';
+import 'package:classsync/domain/failures/app_failure.dart';
+import 'package:classsync/domain/models/class_entry.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('addClass stores a valid class', () async {
+    final repo = FakeClassRepository();
+    final before = (await repo.watchMyClasses().first).length;
+
+    await repo.addClass(
+      const ClassEntry(
+        id: '',
+        name: 'Physics',
+        days: [5],
+        startMinute: 540,
+        endMinute: 600,
+        colorValue: 0xFFFF9800,
+      ),
+    );
+
+    expect((await repo.watchMyClasses().first).length, before + 1);
+  });
+
+  test('addClass rejects an end time before the start time', () async {
+    final repo = FakeClassRepository();
+
+    await expectLater(
+      repo.addClass(
+        const ClassEntry(
+          id: '',
+          name: 'Bad',
+          days: [1],
+          startMinute: 600,
+          endMinute: 540,
+          colorValue: 0xFF000000,
+        ),
+      ),
+      throwsA(isA<InvalidData>()),
+    );
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\fake_friend_repository_test.dart
+========================================
+import 'package:classsync/data/fake/fake_friend_repository.dart';
+import 'package:classsync/domain/failures/app_failure.dart';
+import 'package:classsync/domain/models/sharing_level.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('a wrong code is rejected', () async {
+    final repo = FakeFriendRepository();
+
+    await expectLater(
+      repo.sendRequestByCode('NOPE-0000'),
+      throwsA(isA<NotFound>()),
+    );
+  });
+
+  test('sending the same request twice is rejected', () async {
+    final repo = FakeFriendRepository();
+
+    await repo.sendRequestByCode('noah-2048');
+    await expectLater(
+      repo.sendRequestByCode('NOAH-2048'),
+      throwsA(isA<AlreadyExists>()),
+    );
+  });
+
+  test('accepting a request adds a friend and clears the request', () async {
+    final repo = FakeFriendRepository();
+
+    await repo.acceptRequest('req-1');
+
+    final friends = await repo.watchFriends().first;
+    final requests = await repo.watchIncomingRequests().first;
+    expect(friends.any((f) => f.displayName == 'Sam Reyes'), isTrue);
+    expect(requests, isEmpty);
+  });
+
+  test('changing the sharing level affects only that friend', () async {
+    final repo = FakeFriendRepository();
+
+    await repo.setSharingLevel('friend-ana', SharingLevel.full);
+
+    final friends = await repo.watchFriends().first;
+    final levels = {for (final f in friends) f.friendId: f.sharingLevel};
+    expect(levels['friend-ana'], SharingLevel.full);
+    expect(levels['friend-ben'], SharingLevel.busyOnly);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\fake_reminder_scheduler.dart
+========================================
+import 'package:classsync/logic/reminder_planner.dart';
+import 'package:classsync/services/notifications/reminder_scheduler.dart';
+
+/// Stands in for the phone's notification system in tests.
+class FakeReminderScheduler implements ReminderScheduler {
+  FakeReminderScheduler({this.allowed = true, this.grantOnRequest = true});
+
+  bool allowed;
+  final bool grantOnRequest;
+  int requestCount = 0;
+  List<PlannedReminder>? lastPlan;
+
+  @override
+  Future<bool> isAllowed() async => allowed;
+
+  @override
+  Future<bool> requestPermission() async {
+    requestCount++;
+    allowed = grantOnRequest;
+    return allowed;
+  }
+
+  @override
+  Future<void> replaceAll(List<PlannedReminder> reminders) async {
+    lastPlan = reminders;
+  }
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\friends_screen_test.dart
+========================================
+import 'package:classsync/core/providers/repository_providers.dart';
+import 'package:classsync/core/theme/app_theme.dart';
+import 'package:classsync/core/widgets/initials_avatar.dart';
+import 'package:classsync/features/friends/friends_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+Future<void> _open(WidgetTester tester) async {
+  final container = ProviderContainer();
+  addTearDown(container.dispose);
+  await container.read(authRepositoryProvider).signInWithGoogle();
+
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(theme: AppTheme.light, home: const FriendsScreen()),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapAdd(WidgetTester tester, String code) async {
+  await tester.enterText(find.byType(TextField), code);
+  await tester.tap(find.text('Add'));
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  test('initialsOf takes the first and last word', () {
+    expect(initialsOf('Maya Reyes'), 'MR');
+    expect(initialsOf('  ana '), 'A');
+    expect(initialsOf(''), '?');
+  });
+
+  testWidgets('shows the code, the request, and the friends', (tester) async {
+    await _open(tester);
+
+    expect(find.text('JC-5T92'), findsOneWidget);
+    expect(find.text('Sam Reyes'), findsOneWidget);
+    expect(find.text('Maya Reyes'), findsOneWidget);
+    expect(find.text('Ana Ramos'), findsOneWidget);
+    expect(find.text('Ben Tan'), findsOneWidget);
+  });
+
+  testWidgets('a wrong code shows an error', (tester) async {
+    await _open(tester);
+
+    await _tapAdd(tester, 'WRONG-1');
+
+    expect(
+      find.text('No one has that code. Check it and try again.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('your own code is rejected', (tester) async {
+    await _open(tester);
+
+    await _tapAdd(tester, 'jc-5t92');
+
+    expect(find.text('Thatâ€™s your own code.'), findsOneWidget);
+  });
+
+  testWidgets('accepting a request makes the person a friend', (tester) async {
+    await _open(tester);
+
+    await tester.tap(find.text('Accept'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Requests'), findsNothing);
+    expect(find.text('Sam Reyes'), findsOneWidget);
+  });
+
+  testWidgets('turning names on asks first, turning them off does not', (
+    tester,
+  ) async {
+    await _open(tester);
+
+    final namesOff = find.bySemanticsLabel('Class names off for Ana');
+    await tester.ensureVisible(namesOff);
+    await tester.tap(namesOff);
+    await tester.pumpAndSettle();
+    expect(find.text('Show class names to Ana Ramos?'), findsOneWidget);
+
+    await tester.tap(find.text('Show names'));
+    await tester.pumpAndSettle();
+    expect(find.text('Names on'), findsNWidgets(2));
+
+    final namesOn = find.bySemanticsLabel('Class names on for Ana');
+    await tester.ensureVisible(namesOn);
+    await tester.tap(namesOn);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Show class names to'), findsNothing);
+    expect(find.text('Names off'), findsNWidgets(2));
+    expect(find.text('Names on'), findsOneWidget);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\friend_schedule_screen_test.dart
+========================================
+import 'package:classsync/core/theme/app_theme.dart';
+import 'package:classsync/features/friends/friend_schedule_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+Future<void> _open(WidgetTester tester, String friendId, int day) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: FriendScheduleScreen(friendId: friendId, initialDay: day),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('a friend who shares everything shows class names', (
+    tester,
+  ) async {
+    await _open(tester, 'friend-ana', 3);
+
+    expect(find.text('Ana Ramos'), findsOneWidget);
+    expect(find.text('Shares full timetable with you.'), findsOneWidget);
+    expect(find.text('Algebra'), findsOneWidget);
+    expect(find.text('Room 1'), findsOneWidget);
+  });
+
+  testWidgets('a friend who shares busy times only hides the details', (
+    tester,
+  ) async {
+    await _open(tester, 'friend-maya', 3);
+
+    expect(find.text('Shares busy and free times only.'), findsOneWidget);
+    expect(find.text('Busy'), findsNWidgets(2));
+    expect(find.text('Chemistry'), findsNothing);
+    expect(find.text('Lab 1'), findsNothing);
+  });
+
+  testWidgets('a day with nothing shows the free-day message', (tester) async {
+    await _open(tester, 'friend-ben', 6);
+
+    expect(find.text('Free all day'), findsOneWidget);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\me_screen_test.dart
+========================================
+import 'package:classsync/core/providers/repository_providers.dart';
+import 'package:classsync/core/theme/app_theme.dart';
+import 'package:classsync/features/auth/auth_providers.dart';
+import 'package:classsync/features/settings/me_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:classsync/features/reminders/reminder_providers.dart';
+
+import 'support/fake_reminder_scheduler.dart';
+
+Future<ProviderContainer> _openSignedIn(WidgetTester tester) async {
+  final container = ProviderContainer(
+    overrides: [
+      reminderSchedulerProvider.overrideWithValue(FakeReminderScheduler()),
+    ],
+  );
+  addTearDown(container.dispose);
+  await container.read(authRepositoryProvider).signInWithGoogle();
+
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(theme: AppTheme.light, home: const MeScreen()),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return container;
+}
+
+void main() {
+  testWidgets('changing the default reminder updates the profile', (
+    tester,
+  ) async {
+    final container = await _openSignedIn(tester);
+
+    expect(find.text('Demo Student'), findsOneWidget);
+    await tester.tap(find.text('30 min'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(authStateProvider).value?.defaultReminderMinutes, 30);
+  });
+
+  testWidgets('signing out clears the user', (tester) async {
+    final container = await _openSignedIn(tester);
+
+    await tester.ensureVisible(find.text('Sign out'));
+    await tester.tap(find.text('Sign out'));
+    // A plain pump, because the spinner shown after sign-out never settles.
+    await tester.pump();
+    await tester.pump();
+
+    expect(container.read(authStateProvider).value, isNull);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\reminder_planner_test.dart
+========================================
+import 'package:classsync/domain/models/class_entry.dart';
+import 'package:classsync/logic/reminder_planner.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+ClassEntry _class({
+  String id = 'a',
+  String name = 'Calculus',
+  List<int> days = const [1, 3, 5],
+  int start = 480,
+  int? reminder,
+  String? room,
+}) {
+  return ClassEntry(
+    id: id,
+    name: name,
+    days: days,
+    startMinute: start,
+    endMinute: start + 60,
+    colorValue: 0xFF2E7D6B,
+    reminderMinutes: reminder,
+    room: room,
+  );
+}
+
+// Monday 19 October 2026, 07:00.
+final _monday = DateTime(2026, 10, 19, 7);
+
+List<PlannedReminder> _plan(
+  List<ClassEntry> classes, {
+  DateTime? now,
+  int maxCount = 60,
+}) {
+  return planReminders(
+    classes: classes,
+    defaultReminderMinutes: 10,
+    now: now ?? _monday,
+    maxCount: maxCount,
+  );
+}
+
+void main() {
+  test('plans one reminder per class day in the next 7 days', () {
+    final plan = _plan([_class()]);
+
+    expect(plan.map((r) => r.at), [
+      DateTime(2026, 10, 19, 7, 50),
+      DateTime(2026, 10, 21, 7, 50),
+      DateTime(2026, 10, 23, 7, 50),
+    ]);
+  });
+
+  test('skips reminders that are already in the past', () {
+    final plan = _plan([_class()], now: DateTime(2026, 10, 19, 8));
+
+    expect(plan.length, 2);
+    expect(plan.first.at, DateTime(2026, 10, 21, 7, 50));
+  });
+
+  test('a per-class reminder overrides the default', () {
+    final plan = _plan([_class(reminder: 30)]);
+
+    expect(plan.first.at, DateTime(2026, 10, 19, 7, 30));
+  });
+
+  test('reminders are sorted by time and numbered from zero', () {
+    final plan = _plan([
+      _class(id: 'a', name: 'Calculus', days: [1], start: 480),
+      _class(id: 'b', name: 'Biology', days: [1], start: 450),
+    ]);
+
+    expect(plan.map((r) => r.title), ['Biology', 'Calculus']);
+    expect(plan.map((r) => r.id), [0, 1]);
+  });
+
+  test('keeps only the earliest reminders when over the limit', () {
+    final plan = _plan([_class()], maxCount: 2);
+
+    expect(plan.length, 2);
+    expect(plan.last.at, DateTime(2026, 10, 21, 7, 50));
+  });
+
+  test('the message shows the start time and the room', () {
+    final plan = _plan([_class(room: 'Room 204')]);
+
+    expect(plan.first.body, 'Starts at 8:00 Â· Room 204');
+  });
+
+  test('no classes means no reminders', () {
+    expect(_plan([]), isEmpty);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\reminder_prompt_test.dart
+========================================
+import 'package:classsync/core/theme/app_theme.dart';
+import 'package:classsync/features/reminders/reminder_providers.dart';
+import 'package:classsync/features/timetable/timetable_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'support/fake_reminder_scheduler.dart';
+
+Future<void> _open(WidgetTester tester, FakeReminderScheduler scheduler) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [reminderSchedulerProvider.overrideWithValue(scheduler)],
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: const TimetableScreen(initialDay: 1),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('explains first, then asks the system for permission', (
+    tester,
+  ) async {
+    final scheduler = FakeReminderScheduler(allowed: false);
+    await _open(tester, scheduler);
+
+    expect(find.text('Allow reminders?'), findsOneWidget);
+    expect(scheduler.requestCount, 0);
+
+    await tester.tap(find.text('Allow reminders'));
+    await tester.pumpAndSettle();
+
+    expect(scheduler.requestCount, 1);
+  });
+
+  testWidgets('Not now does not ask the system', (tester) async {
+    final scheduler = FakeReminderScheduler(allowed: false);
+    await _open(tester, scheduler);
+
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+
+    expect(scheduler.requestCount, 0);
+  });
+
+  testWidgets('no dialog when reminders are already allowed', (tester) async {
+    await _open(tester, FakeReminderScheduler());
+
+    expect(find.text('Allow reminders?'), findsNothing);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\reminder_sync_test.dart
+========================================
+import 'package:classsync/core/providers/repository_providers.dart';
+import 'package:classsync/features/reminders/reminder_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'support/fake_reminder_scheduler.dart';
+
+void main() {
+  test('signing in schedules reminders and signing out clears them', () async {
+    final scheduler = FakeReminderScheduler();
+    final container = ProviderContainer(
+      overrides: [reminderSchedulerProvider.overrideWithValue(scheduler)],
+    );
+    addTearDown(container.dispose);
+    container.listen(reminderSyncProvider, (_, _) {});
+
+    final auth = container.read(authRepositoryProvider);
+    await auth.signInWithGoogle();
+    await pumpEventQueue();
+    expect(scheduler.lastPlan, isNotEmpty);
+
+    await auth.signOut();
+    await pumpEventQueue();
+    expect(scheduler.lastPlan, isEmpty);
+  });
+
+  test('nothing is scheduled while notifications are blocked', () async {
+    final scheduler = FakeReminderScheduler(allowed: false);
+    final container = ProviderContainer(
+      overrides: [reminderSchedulerProvider.overrideWithValue(scheduler)],
+    );
+    addTearDown(container.dispose);
+    container.listen(reminderSyncProvider, (_, _) {});
+
+    await container.read(authRepositoryProvider).signInWithGoogle();
+    await pumpEventQueue();
+
+    expect(scheduler.lastPlan, isNull);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\schedule_format_test.dart
+========================================
+import 'package:classsync/core/utils/schedule_format.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('formatMinutes writes hours and padded minutes', () {
+    expect(formatMinutes(510), '8:30');
+    expect(formatMinutes(0), '0:00');
+    expect(formatMinutes(1050), '17:30');
+  });
+
+  test('formatMinutes shows midnight as 24:00 and clamps beyond that', () {
+    expect(formatMinutes(1440), '24:00');
+    expect(formatMinutes(-30), '0:00');
+    expect(formatMinutes(2000), '24:00');
+  });
+
+  test('weekday helpers start on Monday', () {
+    expect(weekdayName(1), 'Monday');
+    expect(weekdayName(7), 'Sunday');
+    expect(weekdayInitial(3), 'W');
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\timetable_screen_test.dart
+========================================
+import 'package:classsync/core/theme/app_theme.dart';
+import 'package:classsync/features/timetable/timetable_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:classsync/features/reminders/reminder_providers.dart';
+import 'support/fake_reminder_scheduler.dart';
+
+Future<void> _openTimetable(WidgetTester tester, {required int day}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        reminderSchedulerProvider.overrideWithValue(FakeReminderScheduler()),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: TimetableScreen(initialDay: day),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('day view lists only that dayâ€™s classes', (tester) async {
+    await _openTimetable(tester, day: 1);
+
+    expect(find.text('Calculus'), findsOneWidget);
+    expect(find.text('Programming'), findsNothing);
+  });
+
+  testWidgets('a day without classes shows the free-day message', (
+    tester,
+  ) async {
+    await _openTimetable(tester, day: 6);
+
+    expect(find.text('Free day'), findsOneWidget);
+  });
+
+  testWidgets('week view shows a class on every day it repeats', (
+    tester,
+  ) async {
+    await _openTimetable(tester, day: 1);
+
+    await tester.tap(find.text('Week'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('This week'), findsOneWidget);
+    expect(find.text('Calculus'), findsNWidgets(3));
+  });
+
+  testWidgets('weekday chips have full names for screen readers', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await _openTimetable(tester, day: 1);
+
+    expect(find.bySemanticsLabel('Tuesday'), findsOneWidget);
+
+    semantics.dispose();
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\widget_test.dart
+========================================
+import 'package:classsync/app.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:classsync/features/reminders/reminder_providers.dart';
+
+import 'support/fake_reminder_scheduler.dart';
+
+Future<void> _openApp(WidgetTester tester) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        reminderSchedulerProvider.overrideWithValue(FakeReminderScheduler()),
+      ],
+      child: const ClassSyncApp(),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _signIn(WidgetTester tester) async {
+  await tester.tap(find.text('Continue with Google'));
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('a signed-out user sees the sign-in screen', (tester) async {
+    await _openApp(tester);
+
+    expect(find.text('Continue with Google'), findsOneWidget);
+  });
+
+  testWidgets('signing in opens the timetable', (tester) async {
+    await _openApp(tester);
+    await _signIn(tester);
+
+    expect(find.text('Add class'), findsOneWidget);
+  });
+
+  testWidgets('the bottom bar switches between tabs', (tester) async {
+    await _openApp(tester);
+    await _signIn(tester);
+
+    await tester.tap(find.text('Friends'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your invite code'), findsOneWidget);
+
+    await tester.tap(find.text('Me'));
+    await tester.pumpAndSettle();
+    expect(find.text('Default reminder'), findsOneWidget);
+  });
+}
+
+
+
+========================================
+FILE: C:\Users\PC\Documents\GitHub\classsync\app\test\support\fake_reminder_scheduler.dart
+========================================
+import 'package:classsync/logic/reminder_planner.dart';
+import 'package:classsync/services/notifications/reminder_scheduler.dart';
+
+/// Stands in for the phone's notification system in tests.
+class FakeReminderScheduler implements ReminderScheduler {
+  FakeReminderScheduler({this.allowed = true, this.grantOnRequest = true});
+
+  bool allowed;
+  final bool grantOnRequest;
+  int requestCount = 0;
+  List<PlannedReminder>? lastPlan;
+
+  @override
+  Future<bool> isAllowed() async => allowed;
+
+  @override
+  Future<bool> requestPermission() async {
+    requestCount++;
+    allowed = grantOnRequest;
+    return allowed;
+  }
+
+  @override
+  Future<void> replaceAll(List<PlannedReminder> reminders) async {
+    lastPlan = reminders;
+  }
+}
+
+
+

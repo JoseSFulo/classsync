@@ -38,10 +38,7 @@ class FirebaseAuthRepository implements AuthRepository {
             final savedMinutes = snapshot.data()?['defaultReminderMinutes'];
             final defaultReminder = savedMinutes is int ? savedMinutes : 10;
 
-            return _toProfile(
-              user,
-              defaultReminderMinutes: defaultReminder,
-            );
+            return _toProfile(user, defaultReminderMinutes: defaultReminder);
           });
     });
   }
@@ -57,9 +54,9 @@ class FirebaseAuthRepository implements AuthRepository {
 
       final googleUser = await _google.authenticate();
 
-      debugPrint('[Google Sign-In] Account selected: ${googleUser.email}');
+      debugPrint('[Google Sign-In] Account selected: ${googleUser!.email}');
 
-      final idToken = googleUser.authentication.idToken;
+      final idToken = (await googleUser.authentication).idToken;
 
       if (idToken == null) {
         debugPrint('[Google Sign-In] ERROR: ID token is null.');
@@ -86,7 +83,15 @@ class FirebaseAuthRepository implements AuthRepository {
 
       debugPrint('[Google Sign-In] SUCCESS: Firebase user authenticated.');
 
-      return _toProfile(user);
+      final profile = _toProfile(user);
+
+      // Save the user's profile and invite code to Firestore
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'displayName': profile.displayName,
+        'inviteCode': profile.inviteCode,
+      }, SetOptions(merge: true));
+
+      return profile;
     } on AppFailure {
       rethrow;
     } on GoogleSignInException catch (e, stackTrace) {
@@ -173,17 +178,14 @@ class FirebaseAuthRepository implements AuthRepository {
     }
   }
 
-    UserProfile _toProfile(
-      User user, {
-      int defaultReminderMinutes = 10,
-    }) {
-      return UserProfile(
-        id: user.uid,
-        displayName: user.displayName ?? 'Student',
-        inviteCode: user.uid.length >= 6
-            ? user.uid.substring(0, 6).toUpperCase()
-            : 'STUDENT',
-        defaultReminderMinutes: defaultReminderMinutes,
-      );
-    }
+  UserProfile _toProfile(User user, {int defaultReminderMinutes = 10}) {
+    return UserProfile(
+      id: user.uid,
+      displayName: user.displayName ?? 'Student',
+      inviteCode: user.uid.length >= 6
+          ? user.uid.substring(0, 6).toUpperCase()
+          : 'STUDENT',
+      defaultReminderMinutes: defaultReminderMinutes,
+    );
   }
+}
