@@ -6,6 +6,10 @@ abstract final class AppRoutes {
   static const classForm = '/class';
   static String editClass(String id) =>
       '$classForm?id=${Uri.encodeQueryComponent(id)}';
+  static const friendSchedule = '/friend/:id';
+
+  static String friendScheduleFor(String id) =>
+      '/friend/${Uri.encodeComponent(id)}';
   static const friends = '/friends';
   static const availability = '/availability';
   static const settings = '/settings';

@@ -37,7 +37,6 @@ class DefaultFirebaseOptions {
     authDomain: 'classsync-app.firebaseapp.com',
     storageBucket: 'classsync-app.appspot.com',
   );
-
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCAhYvkUiSrw3TYQRA4O2I0aOPcObRLBQY',
     appId: '1:123599252272:android:566e469806c147f4ba76f5',
