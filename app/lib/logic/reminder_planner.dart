@@ -37,20 +37,33 @@ List<PlannedReminder> planReminders({
   final found = <({DateTime at, ClassEntry entry})>[];
 
   for (var offset = 0; offset < days; offset++) {
-    // DateTime rolls over month ends by itself, so day + offset is safe.
     final day = DateTime(now.year, now.month, now.day + offset);
+
     for (final entry in classes) {
       if (!entry.days.contains(day.weekday)) {
         continue;
       }
+
       final lead = entry.reminderMinutes ?? defaultReminderMinutes;
-      final at = DateTime(
-        day.year,
-        day.month,
-        day.day,
-        0,
-        entry.startMinute - lead,
+      final alarmMinute = entry.startMinute - lead;
+
+      // Smart check: Is there a previous class that bleeds into our alarm time?
+      final isBackToBack = classes.any(
+        (other) =>
+            other.id != entry.id &&
+            other.days.contains(day.weekday) &&
+            other.startMinute <=
+                entry.startMinute && // Class starts before or at the same time
+            other.endMinute >
+                alarmMinute, // Class ends AFTER our alarm is supposed to ring
       );
+
+      if (isBackToBack) {
+        continue; // Skip this alarm, you are already in a class
+      }
+
+      final at = DateTime(day.year, day.month, day.day, 0, alarmMinute);
+
       if (at.isAfter(now)) {
         found.add((at: at, entry: entry));
       }

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../domain/failures/app_failure.dart';
 import '../../domain/models/friend.dart';
 import '../../domain/models/friend_request.dart';
 import '../../domain/models/sharing_level.dart';
@@ -57,13 +58,13 @@ class FirestoreFriendRepository implements FriendRepository {
         .get();
 
     if (query.docs.isEmpty) {
-      throw Exception('Invalid invite code. No user found.');
+      throw const NotFound('Invalid invite code. No user found.');
     }
 
     final targetUserId = query.docs.first.id;
 
     if (targetUserId == _userId) {
-      throw Exception('You cannot add yourself as a friend.');
+      throw const InvalidData('You cannot add yourself as a friend.');
     }
 
     final myDoc = await _firestore.collection('users').doc(_userId).get();

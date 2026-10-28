@@ -5,12 +5,15 @@ import '../../core/providers/repository_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/schedule_format.dart';
+import '../../core/widgets/day_chips.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/pill_chip.dart';
 import '../../domain/models/busy_slot.dart';
 import '../../domain/models/friend.dart';
+import '../../features/friends/friends_providers.dart';
 import '../../features/timetable/timetable_providers.dart';
 import '../../logic/availability_provider.dart';
+import 'availability_providers.dart';
 
 class AvailabilityScreen extends ConsumerStatefulWidget {
   const AvailabilityScreen({super.key});
@@ -169,6 +172,9 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
                 ),
             ],
           ),
+        ),
+      ),
+    );
         ),
       ),
     );
