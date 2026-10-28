@@ -14,7 +14,7 @@ class FakeAuthRepository implements AuthRepository {
     const profile = UserProfile(
       id: 'user-1',
       displayName: 'Demo Student',
-      inviteCode: 'DEMO',
+      inviteCode: 'JC-5T92',
     );
     store.value = profile;
     return profile;

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/schedule_format.dart';
+import '../../core/widgets/day_chips.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/pill_chip.dart';
 import '../../domain/failures/app_failure.dart';
@@ -108,18 +109,9 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
           else if (_showWeek)
             WeekGrid(classes: classes, onTapClass: (c) => _openClassForm(c))
           else ...[
-            Wrap(
-              spacing: AppSpacing.s,
-              runSpacing: AppSpacing.s,
-              children: [
-                for (var d = 1; d <= 7; d++)
-                  PillChip(
-                    label: weekdayInitial(d),
-                    semanticLabel: weekdayName(d),
-                    selected: d == _day,
-                    onTap: () => setState(() => _day = d),
-                  ),
-              ],
+            DayChips(
+              isSelected: (d) => d == _day,
+              onTap: (d) => setState(() => _day = d),
             ),
             const SizedBox(height: AppSpacing.l),
             if (today.isEmpty)

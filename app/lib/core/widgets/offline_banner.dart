@@ -12,8 +12,14 @@ class OfflineBanner extends StatelessWidget {
       child: const Text(
         "You're offline. Your schedule still works; friends' updates need internet.",
         style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
         textAlign: TextAlign.center,
       ),
     );
   }
+}
 }

@@ -8,6 +8,10 @@ import '../../features/auth/splash_screen.dart';
 import '../../features/availability/availability_screen.dart';
 import '../../features/friends/friends_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/friends/friends_screen.dart';
+import '../../features/friends/friend_schedule_screen.dart';
+import '../../features/settings/me_screen.dart';
+import '../../features/timetable/class_form_screen.dart';
 import '../../features/timetable/timetable_screen.dart';
 import '../widgets/app_shell.dart';
 import 'app_routes.dart';
@@ -49,6 +53,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.signIn,
         builder: (context, state) => const SignInScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.classForm,
+        builder: (context, state) =>
+            ClassFormScreen(classId: state.uri.queryParameters['id']),
+      ),
+      GoRoute(
+        path: AppRoutes.friendSchedule,
+        builder: (context, state) =>
+            FriendScheduleScreen(friendId: state.pathParameters['id']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => AppShell(shell: shell),
