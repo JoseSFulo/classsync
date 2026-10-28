@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/router/app_routes.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/pill_chip.dart';
@@ -9,19 +11,27 @@ import '../auth/auth_providers.dart';
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+  Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete your account?'),
-        content: const Text('This removes your account, classes, and friendships. It cannot be undone.'),
+        content: const Text(
+          'This removes your account, classes, and friendships. '
+          'It cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Delete everything'),
           ),
@@ -29,8 +39,12 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
 
-    if (confirm == true) {
-      await ref.read(authRepositoryProvider).deleteAccount();
+    if (confirm != true || !context.mounted) return;
+
+    await ref.read(authRepositoryProvider).deleteAccount();
+
+    if (context.mounted) {
+      context.go(AppRoutes.signIn);
     }
   }
 
