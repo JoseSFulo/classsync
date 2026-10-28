@@ -9,6 +9,7 @@ import '../../features/availability/availability_screen.dart';
 import '../../features/friends/friend_schedule_screen.dart';
 import '../../features/friends/friends_screen.dart';
 import '../../features/settings/me_screen.dart';
+import '../../features/settings/settings_screen.dart';
 import '../../features/timetable/class_form_screen.dart';
 import '../../features/timetable/timetable_screen.dart';
 import '../widgets/app_shell.dart';
@@ -93,7 +94,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.settings,
-                builder: (context, state) => const MeScreen(),
+                builder: (context, state) => const SettingsScreen(),
               ),
             ],
           ),

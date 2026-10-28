@@ -1,9 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../core/router/app_routes.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/schedule_format.dart';
 import '../../core/widgets/day_chips.dart';
@@ -12,15 +9,14 @@ import '../../core/widgets/pill_chip.dart';
 import '../../domain/failures/app_failure.dart';
 import '../../domain/models/class_entry.dart';
 import '../auth/auth_providers.dart';
-import '../reminders/reminder_prompt.dart';
 import 'class_block.dart';
+import 'class_form_sheet.dart';
 import 'timetable_providers.dart';
 import 'week_grid.dart';
 
 class TimetableScreen extends ConsumerStatefulWidget {
   const TimetableScreen({this.initialDay, super.key});
 
-  /// 1 (Monday) to 7 (Sunday). Defaults to today.
   final int? initialDay;
 
   @override
@@ -30,22 +26,10 @@ class TimetableScreen extends ConsumerStatefulWidget {
 class _TimetableScreenState extends ConsumerState<TimetableScreen> {
   late int _day = widget.initialDay ?? DateTime.now().weekday;
   bool _showWeek = false;
-  @override
-  void initState() {
-    super.initState();
-    // Ask once the screen is on display, so the dialog has something behind it.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        unawaited(offerReminders(context, ref));
-      }
-    });
+
+  void _openClassForm([ClassEntry? entry]) {
+    ClassFormSheet.show(context, entry: entry);
   }
-
-  // The class form screen arrives on Day 3. For now it is a placeholder.
-  void _addClass() => context.push(AppRoutes.classForm);
-
-  void _editClass(ClassEntry entry) =>
-      context.push(AppRoutes.editClass(entry.id));
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +40,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addClass,
+        onPressed: () => _openClassForm(),
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         icon: const Icon(Icons.add),
@@ -89,7 +73,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
         AppSpacing.xl,
         AppSpacing.xl,
         AppSpacing.xl,
-        96, // keeps the last class clear of the Add class button
+        96,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,11 +104,10 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
             const EmptyState(
               title: 'Nothing here yet',
               message:
-                  'Add your first class and I’ll remind you before it '
-                  'starts.',
+                  'Add your first class and I’ll remind you before it starts.',
             )
           else if (_showWeek)
-            WeekGrid(classes: classes, onTapClass: _editClass)
+            WeekGrid(classes: classes, onTapClass: (c) => _openClassForm(c))
           else ...[
             DayChips(
               isSelected: (d) => d == _day,
@@ -135,8 +118,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
               EmptyState(
                 title: 'Free day',
                 message:
-                    'No classes on ${weekdayName(_day)}. '
-                    'Enjoy the slow day.',
+                    'No classes on ${weekdayName(_day)}. Enjoy the slow day.',
               )
             else
               for (final c in today)
@@ -145,7 +127,7 @@ class _TimetableScreenState extends ConsumerState<TimetableScreen> {
                   child: ClassBlock(
                     entry: c,
                     defaultReminderMinutes: defaultMinutes,
-                    onTap: () => _editClass(c),
+                    onTap: () => _openClassForm(c),
                   ),
                 ),
           ],

@@ -178,14 +178,17 @@ class FirebaseAuthRepository implements AuthRepository {
     }
   }
 
-  UserProfile _toProfile(User user, {int defaultReminderMinutes = 10}) {
-    return UserProfile(
-      id: user.uid,
-      displayName: user.displayName ?? 'Student',
-      inviteCode: user.uid.length >= 6
-          ? user.uid.substring(0, 6).toUpperCase()
-          : 'STUDENT',
-      defaultReminderMinutes: defaultReminderMinutes,
-    );
+    UserProfile _toProfile(
+      User user, {
+      int defaultReminderMinutes = 10,
+    }) {
+      return UserProfile(
+        id: user.uid,
+        displayName: user.displayName ?? 'Student',
+        inviteCode: user.uid.length >= 6
+            ? user.uid.substring(0, 6).toUpperCase()
+            : 'STUDENT',
+        defaultReminderMinutes: defaultReminderMinutes,
+      );
+    }
   }
-}
