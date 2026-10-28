@@ -11,7 +11,6 @@ class OfflineBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: const Text(
         "You're offline. Your schedule still works; friends' updates need internet.",
-        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
         style: TextStyle(
           color: Colors.white,
           fontSize: 13,
@@ -21,5 +20,4 @@ class OfflineBanner extends StatelessWidget {
       ),
     );
   }
-}
 }

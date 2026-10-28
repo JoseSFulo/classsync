@@ -1,4 +1,31 @@
+import 'package:classsync/app.dart';
+import 'package:classsync/features/reminders/reminder_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/fake_reminder_scheduler.dart';
+
+Future<void> _openApp(WidgetTester tester) async {
+  final container = ProviderContainer(
+    overrides: [
+      reminderSchedulerProvider.overrideWithValue(FakeReminderScheduler()),
+    ],
+  );
+  addTearDown(container.dispose);
+
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: const ClassSyncApp(),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _signIn(WidgetTester tester) async {
+  await tester.tap(find.text('Continue with Google'));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   testWidgets('a signed-out user sees the sign-in screen', (tester) async {
