@@ -29,7 +29,9 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
     final appColors = context.appColors;
 
     final friendsAsync = ref.watch(
-      StreamProvider<List<Friend>>((ref) => ref.watch(friendRepositoryProvider).watchFriends()),
+      StreamProvider<List<Friend>>(
+        (ref) => ref.watch(friendRepositoryProvider).watchFriends(),
+      ),
     );
     final myClasses = ref.watch(myClassesProvider).value ?? [];
 
@@ -62,7 +64,8 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
                           PillChip(
                             label: f.displayName,
                             selected: _selectedFriendId == f.friendId,
-                            onTap: () => setState(() => _selectedFriendId = f.friendId),
+                            onTap: () =>
+                                setState(() => _selectedFriendId = f.friendId),
                           ),
                           const SizedBox(width: AppSpacing.s),
                         ],
@@ -92,18 +95,23 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
               if (_selectedFriendId == null)
                 const EmptyState(
                   title: 'No friends added',
-                  message: 'Add friends in the Friends tab to find mutual free time.',
+                  message:
+                      'Add friends in the Friends tab to find mutual free time.',
                 )
               else
                 Consumer(
                   builder: (context, ref, _) {
                     final busySlotsAsync = ref.watch(
-                      StreamProvider<List<BusySlot>>((ref) =>
-                          ref.watch(friendScheduleRepositoryProvider).watchBusySlots(_selectedFriendId!)),
+                      StreamProvider<List<BusySlot>>(
+                        (ref) => ref
+                            .watch(friendScheduleRepositoryProvider)
+                            .watchBusySlots(_selectedFriendId!),
+                      ),
                     );
 
                     return busySlotsAsync.when(
-                      loading: () => const Center(child: CircularProgressIndicator()),
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
                       error: (err, _) => EmptyState(
                         title: 'Couldn’t load friend schedule',
                         message: err.toString(),
@@ -120,30 +128,39 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
                         if (freeSlots.isEmpty) {
                           return const EmptyState(
                             title: 'No mutual free time',
-                            message: 'Both of you are busy during standard school hours.',
+                            message:
+                                'Both of you are busy during standard school hours.',
                           );
                         }
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Everyone free', style: theme.textTheme.titleMedium),
+                            Text(
+                              'Everyone free',
+                              style: theme.textTheme.titleMedium,
+                            ),
                             const SizedBox(height: AppSpacing.m),
                             for (final slot in freeSlots) ...[
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(AppSpacing.l),
-                                margin: const EdgeInsets.only(bottom: AppSpacing.m),
+                                margin: const EdgeInsets.only(
+                                  bottom: AppSpacing.m,
+                                ),
                                 decoration: BoxDecoration(
                                   color: theme.colorScheme.surface,
                                   border: Border.all(color: appColors.line),
-                                  borderRadius: BorderRadius.circular(AppRadius.card),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.card,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             '${formatMinutes(slot.startMinute)} – ${formatMinutes(slot.endMinute)}',
@@ -156,7 +173,10 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
                                         ],
                                       ),
                                     ),
-                                    Icon(Icons.check_circle_outline, color: theme.colorScheme.primary),
+                                    Icon(
+                                      Icons.check_circle_outline,
+                                      color: theme.colorScheme.primary,
+                                    ),
                                   ],
                                 ),
                               ),
