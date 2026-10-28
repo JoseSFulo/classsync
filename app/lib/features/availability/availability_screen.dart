@@ -74,17 +74,21 @@ class _AvailabilityScreenState extends ConsumerState<AvailabilityScreen> {
               const SizedBox(height: AppSpacing.l),
 
               // Day Selector Chips
-              Wrap(
-                spacing: AppSpacing.s,
-                children: [
-                  for (var d = 1; d <= 7; d++)
-                    PillChip(
-                      label: weekdayInitial(d),
-                      semanticLabel: weekdayName(d),
-                      selected: d == _day,
-                      onTap: () => setState(() => _day = d),
-                    ),
-                ],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var d = 1; d <= 7; d++) ...[
+                      if (d > 1) const SizedBox(width: AppSpacing.s),
+                      PillChip(
+                        label: weekdayInitial(d),
+                        semanticLabel: weekdayName(d),
+                        selected: d == _day,
+                        onTap: () => setState(() => _day = d),
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: AppSpacing.xl),
 
